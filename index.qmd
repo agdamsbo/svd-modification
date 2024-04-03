@@ -1,0 +1,58 @@
+---
+title: Svd-modification
+authors:
+  - name: Andreas Gammelgaard Damsbo
+    orcid: 0000-0002-7559-1154
+    email: andrlr@rm.dk
+    url: https://pure.au.dk/portal/en/persons/andreas-gammelgaard-damsbo(e3c4afce-3eba-4456-8b8b-2fd90775c87a).html
+    affiliations:
+      - ref: dsc
+      - ref: dcm
+      - ref: sdc
+    corresponding: true
+    roles:
+      - writing
+      - analysing
+      - data collection
+affiliations:
+  - id: dsc
+    name: Danish Stroke Centre
+    department: Aarhus University Hospital
+    city: Aarhus
+    country: Denmark
+    url: https://www.en.auh.dk/departments/danish-stroke-centre/
+  - id: dcm
+    name: Department of Clinical Medicine
+    department: Aarhus University
+    city: Aarhus
+    country: Denmark
+    url: https://clin.au.dk/
+  - id: sdc
+    name: Steno Diabetes Centre
+    department: Aarhus University Hospital
+    city: Aarhus
+    country: Denmark
+    url: https://www.stenoaarhus.dk/
+bibliography: references.bib
+abstract: |
+  **Background and aims** 
+  Physical activity (PA) may reduce the development of small vessel disease (SVD). The effect of physical activity and more classical vascular risk factors such as hypertension and diabetes in the development of SVD is debated, however. We aim to investigate the effect modification of physical activity on traditional vascular risk factors and the burden of small vessel disease among acute ischemic stroke patients.
+  
+  **Methods**
+  We have pooled patients from two clinical trials on acute ischemic stroke treatment. The main outcome is an ordinal scale score of quantified MR biomarkers of small vessel disease (SVD) burden based on visually assessed acute stroke scans (T2* or SWI and FLAIR sequences). Biomarkers includes microbleeds, old lacunar infarcts, superficial siderosis, white matter hyperintensities and atrophy. Covariates includes age, sex, pre-stroke physical activity, diabetes, hypertension, atrial fibrillation and previous cardiovascular diseases. 
+  Pre-stroke PA was assessed with a questionnaire on inclusion within a few days after stroke onset. Data will be analyzed using bivariate and multivariate linear regression analysis.
+
+  **Results**
+  We expect to include a total of around 1000 adult patients admitted to the comprehensive stroke centre at Aarhus University Hospital between 2013-2022. Preliminary results will be presented at ESOC 2024.
+  
+  **Conclusions**
+  Physical activity may be an important factor in modifying the risk of SVD development in stroke patients.
+
+---
+
+```{r setup}
+source(here::here("R/functions.R"))
+```
+
+## Section
+This is a simple placeholder for the manuscript's main document [@knuth84].

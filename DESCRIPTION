@@ -1,0 +1,20 @@
+Package: svd-modification
+Title: Article on SVD burden and effect modification on lifestyle factors in stroke
+Version: 0.0.0.9000
+Authors@R: 
+    person("Andreas Gammelgaard", "Damsbo", , "agdamsbo@clin.au.dk", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-7559-1154"))
+Description: What the package does (one paragraph).
+License: CC BY 4.0
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Imports: 
+    ggplot2,
+    here,
+    pak,
+    purrr,
+    REDCapCAST,
+    renv,
+    rmarkdown,
+    usethis
