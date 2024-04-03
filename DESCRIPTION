@@ -18,3 +18,5 @@ Imports:
     renv,
     rmarkdown,
     usethis
+URL: https://github.com/agdamsbo/svd-modification
+BugReports: https://github.com/agdamsbo/svd-modification/issues
