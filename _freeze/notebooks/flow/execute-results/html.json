@@ -1,0 +1,15 @@
+{
+  "hash": "cc31d85148ababd5ff6ee8ef257aa4ad",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: Flowchart creation\nformat: html\n---\n\n::: {.cell}\n\n```{.r .cell-code .hidden}\nsource(here::here(\"R/functions.R\"))\ntargets::tar_config_set(store = here::here(\"_targets\"))\n```\n:::\n\n::: {.cell}\n\n```{.r .cell-code .hidden}\nls <- targets::tar_read(\"ls_data\") |> \n  create_flowchart(export.path = here::here(\"Images/flowchart.png\")) |> \n  consort:::plot.consort(grViz = TRUE)\n```\n\n::: {.cell-output .cell-output-stderr .hidden}\n\n```\nJoining with `by = join_by(record_id)`\n```\n\n\n:::\n\n```{.r .cell-code .hidden}\nwriteLines(ls$x$diagram,con = here::here(\"notebooks/flow.dot\"))\n```\n:::\n\n```{dot}\n//| label: fig-flowchart\n//| fig-cap: \"Flowchart of subject included for analysis\"\n//| file: flow.dot\ndigraph consort_diagram {\n  graph [layout = dot]\n\nnode [shape = rectangle, style = \"rounded,filled\", fillcolor = \"#A9C7FD\" color = \"#4F81BD\"]\nlabel4 [label = \"Pooled subjects with AIS\"]\nlabel5 [label = \"Subjects available for analysis\"]\n\n\nedge[style=invis];\nlabel4 -> label5;\n\n\n# node definitions with substituted label text\n  node [shape = rectangle, fillcolor = Biege, style=\"\", fillcolor = \"\", color = \"\"]\n\nnode1 [label = \"All subjects (n=1055)\"]\nnode2 [label = \"Excluded (n=518):\\l• Manglende billeder (n=97)\\l• Not yet assessed (n=421)\\l\"]\nnode3 [label = \"Final dataset (n=537)\"]\n\n\n## Invisible point node for joints\n\nnode [shape = point, width = 0]\n\nP1\n\nsubgraph {\n  rank = same; rankdir = LR; label4;  node1;\n  }\nsubgraph {\n  rank = same; rankdir = LR; P1; node2;\n  }\nsubgraph {\n  rank = same; rankdir = LR; label5; node3;\n  }\n\nedge[style=\"\"];\n\nnode1 -> P1 [arrowhead = none];\nP1 -> node2;\nP1 -> node3;\n\n\n\n}\n\n```\n",
+    "supporting": [],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}

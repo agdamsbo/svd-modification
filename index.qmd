@@ -1,38 +1,5 @@
 ---
-title: Svd-modification
-authors:
-  - name: Andreas Gammelgaard Damsbo
-    orcid: 0000-0002-7559-1154
-    email: andrlr@rm.dk
-    url: https://pure.au.dk/portal/en/persons/andreas-gammelgaard-damsbo(e3c4afce-3eba-4456-8b8b-2fd90775c87a).html
-    affiliations:
-      - ref: dsc
-      - ref: dcm
-      - ref: sdc
-    corresponding: true
-    roles:
-      - writing
-      - analysing
-      - data collection
-affiliations:
-  - id: dsc
-    name: Danish Stroke Centre
-    department: Aarhus University Hospital
-    city: Aarhus
-    country: Denmark
-    url: https://www.en.auh.dk/departments/danish-stroke-centre/
-  - id: dcm
-    name: Department of Clinical Medicine
-    department: Aarhus University
-    city: Aarhus
-    country: Denmark
-    url: https://clin.au.dk/
-  - id: sdc
-    name: Steno Diabetes Centre
-    department: Aarhus University Hospital
-    city: Aarhus
-    country: Denmark
-    url: https://www.stenoaarhus.dk/
+title: Physical activity as an effect modificator of lifestyle factors on small vessel deisease burden
 bibliography: references.bib
 abstract: |
   **Background and aims** 
@@ -47,12 +14,26 @@ abstract: |
   
   **Conclusions**
   Physical activity may be an important factor in modifying the risk of SVD development in stroke patients.
-
 ---
 
 ```{r setup}
 source(here::here("R/functions.R"))
 ```
 
-## Section
-This is a simple placeholder for the manuscript's main document [@knuth84].
+## Introduction
+
+This is, for now, just a placeholder for upcoming article on physical activity as an effect modificator of lifestyle factors on the burden of small vessel disease in stroke patients.
+
+## Methods
+
+This study is based on a pooled dataset from two different randomised, clinical trials on stroke patients.
+
+## Results
+
+Please refer to @fig-flowchart for an overview of subjects included for analysis.
+
+```{dot}
+//| label: fig-flowchart
+//| fig-cap: "Flowchart of subject included for analysis"
+//| file: images/flow.dot
+```

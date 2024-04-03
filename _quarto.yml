@@ -9,6 +9,7 @@ format:
     comments:
       hypothesis: true
   docx: default
+  pdf: default
   jats: default
 
   # (other formats)
@@ -19,6 +20,52 @@ execute:
   eval: true
   echo: false
   message: false
+  
+authors:
+  - name: Andreas Gammelgaard Damsbo
+    orcid: 0000-0002-7559-1154
+    email: andrlr@rm.dk
+    url: https://pure.au.dk/portal/en/persons/andreas-gammelgaard-damsbo(e3c4afce-3eba-4456-8b8b-2fd90775c87a).html
+    affiliations:
+      - ref: dsc
+      - ref: dcm
+      - ref: sdc
+    corresponding: true
+    roles:
+      - writing
+      - analysing
+      - data collection
+  - name: Rolf Ankerlund Blauenfeldt
+    affiliations:
+      - ref: dsc
+      - ref: dcm
+  - name: Grethe Andersen
+    affiliations:
+      - ref: dsc
+      - ref: dcm
+  - name: Janne Kaergaard Mortensen
+    affiliations:
+      - ref: dsc
+      - ref: dcm
+affiliations:
+  - id: dsc
+    name: Danish Stroke Centre
+    department: Aarhus University Hospital
+    city: Aarhus
+    country: Denmark
+    url: https://www.en.auh.dk/departments/danish-stroke-centre/
+  - id: dcm
+    name: Department of Clinical Medicine
+    department: Aarhus University
+    city: Aarhus
+    country: Denmark
+    url: https://clin.au.dk/
+  - id: sdc
+    name: Steno Diabetes Centre
+    department: Aarhus University Hospital
+    city: Aarhus
+    country: Denmark
+    url: https://www.stenoaarhus.dk/
 
 
 
