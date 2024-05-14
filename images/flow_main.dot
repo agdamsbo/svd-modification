@@ -1,0 +1,57 @@
+digraph consort_diagram {
+  graph [layout = dot]
+
+node [shape = rectangle, style = "rounded,filled", fillcolor = "#A9C7FD" color = "#4F81BD"]
+label6 [label = "Pooled subjects with AIS"]
+label7 [label = "Subjects available for initial analysis"]
+label8 [label = "Subjects available for final analysis"]
+
+
+edge[style=invis];
+label6 -> label7 -> label8;
+
+
+# node definitions with substituted label text
+  node [shape = rectangle, fillcolor = Biege, style="", fillcolor = "", color = ""]
+
+node1 [label = "All subjects (n=1055)"]
+node2 [label = "No MR (n=175):\l• No acute MR performed (n=169)\l• Not assessed (n=3)\l• Other reasons (n=3)\l"]
+node3 [label = "Patients considered (n=880)"]
+node4 [label = "No PASE available (n=115):\l• Missing (n=115)\l"]
+node5 [label = "Patients included (n=765)"]
+
+
+## Invisible point node for joints
+
+node [shape = point, width = 0]
+
+P1 P2
+
+subgraph {
+  rank = same; rankdir = LR; label6;  node1;
+  }
+subgraph {
+  rank = same; rankdir = LR; P1; node2;
+  }
+subgraph {
+  rank = same; rankdir = LR; label7;  node3;
+  }
+subgraph {
+  rank = same; rankdir = LR; P2; node4;
+  }
+subgraph {
+  rank = same; rankdir = LR; label8; node5;
+  }
+
+edge[style=""];
+
+node1 -> P1 [arrowhead = none];
+P1 -> node2;
+P1 -> node3;
+node3 -> P2 [arrowhead = none];
+P2 -> node4;
+P2 -> node5;
+
+
+}
+

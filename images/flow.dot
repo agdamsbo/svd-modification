@@ -14,8 +14,8 @@ label4 -> label5;
   node [shape = rectangle, fillcolor = Biege, style="", fillcolor = "", color = ""]
 
 node1 [label = "All subjects (n=1055)"]
-node2 [label = "Excluded (n=518):\l• Manglende billeder (n=97)\l• Not yet assessed (n=421)\l"]
-node3 [label = "Final dataset (n=537)"]
+node2 [label = "Excluded (n=172):\l• No acute MR performed (n=169)\l• Other reasons (n=3)\l"]
+node3 [label = "Final dataset (n=883)"]
 
 
 ## Invisible point node for joints

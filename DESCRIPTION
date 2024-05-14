@@ -10,19 +10,28 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1
 Imports: 
+    rankinPlot,
     consort,
     DiagrammeR,
     DiagrammeRsvg,
+    genodds,
     ggplot2,
+    gtsummary,
     here,
+    irr,
+    labelled,
     pak,
     purrr,
     REDCapCAST,
     renv,
     rmarkdown,
     rsvg,
+    skimr,
+    stRoke,
     targets,
-    usethis
+    tidycomm,
+    usethis,
+    viridis
 URL: https://github.com/agdamsbo/svd-modification
 BugReports: https://github.com/agdamsbo/svd-modification/issues
 Suggests: 

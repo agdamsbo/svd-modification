@@ -77,7 +77,45 @@
 \makeatletter
 \def\fps@figure{htbp}
 \makeatother
+% definitions for citeproc citations
+\NewDocumentCommand\citeproctext{}{}
+\NewDocumentCommand\citeproc{mm}{%
+  \begingroup\def\citeproctext{#2}\cite{#1}\endgroup}
+\makeatletter
+ % allow citations to break across lines
+ \let\@cite@ofmt\@firstofone
+ % avoid brackets around text for \cite:
+ \def\@biblabel#1{}
+ \def\@cite#1#2{{#1\if@tempswa , #2\fi}}
+\makeatother
+\newlength{\cslhangindent}
+\setlength{\cslhangindent}{1.5em}
+\newlength{\csllabelwidth}
+\setlength{\csllabelwidth}{3em}
+\newenvironment{CSLReferences}[2] % #1 hanging-indent, #2 entry-spacing
+ {\begin{list}{}{%
+  \setlength{\itemindent}{0pt}
+  \setlength{\leftmargin}{0pt}
+  \setlength{\parsep}{0pt}
+  % turn on hanging indent if param 1 is 1
+  \ifodd #1
+   \setlength{\leftmargin}{\cslhangindent}
+   \setlength{\itemindent}{-1\cslhangindent}
+  \fi
+  % set entry spacing
+  \setlength{\itemsep}{#2\baselineskip}}}
+ {\end{list}}
+\usepackage{calc}
+\newcommand{\CSLBlock}[1]{\hfill\break\parbox[t]{\linewidth}{\strut\ignorespaces#1\strut}}
+\newcommand{\CSLLeftMargin}[1]{\parbox[t]{\csllabelwidth}{\strut#1\strut}}
+\newcommand{\CSLRightInline}[1]{\parbox[t]{\linewidth - \csllabelwidth}{\strut#1\strut}}
+\newcommand{\CSLIndent}[1]{\hspace{\cslhangindent}#1}
 
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{longtable}
+\usepackage{colortbl}
+\usepackage{array}
 \KOMAoption{captions}{tableheading}
 \makeatletter
 \@ifpackageloaded{caption}{}{\usepackage{caption}}
@@ -139,7 +177,11 @@
 \title{Physical activity as an effect modificator of lifestyle factors
 on small vessel deisease burden}
 \author{Andreas Gammelgaard Damsbo \and Rolf Ankerlund
-Blauenfeldt \and Grethe Andersen \and Janne Kaergaard Mortensen}
+Blauenfeldt \and Sigrid Breinholt Vestergaard \and Niels Lech
+Pedersen \and Kim Morgenstjerne Østerskov \and Mette Foldager
+Hindsholm \and Arzu Bilgin-Freiert \and Claus Ziegler
+Simonsen \and Rikke Beese Dalby \and Grethe Andersen \and Janne
+Kaergaard Mortensen}
 \date{}
 
 \begin{document}
@@ -180,14 +222,20 @@ Notebook}}
 
 \subsection{Introduction}\label{introduction}
 
-This is, for now, just a placeholder for upcoming article on physical
-activity as an effect modificator of lifestyle factors on the burden of
-small vessel disease in stroke patients.
+THe correlation between physical activity, small vessel disease and
+classical risk factors is very much debated and not fully
+understood.(Moniruzzaman et al. 2020; Torres et al. 2019; Landman et al.
+2021)
+
+In this abstract, we present the preliminary results from our pooled SVD
+study, also presented at
+\href{https://apps.congrex.com/esoc2024/en-GB/pag/presentation/362937}{ESOC
+2024}.
 
 \subsection{Methods}\label{methods}
 
-This study is based on a pooled dataset from two different randomised,
-clinical trials on stroke patients.
+This study is a cross-sectional study, based on a pooled dataset from
+two different randomised, clinical trials on patients with acute stroke.
 
 \subsection{Results}\label{results}
 
@@ -198,7 +246,7 @@ included for analysis.
 
 \centering{
 
-\includegraphics[width=5.5in,height=3.5in]{index_files/figure-latex/dot-figure-2.png}
+\includegraphics[width=5.5in,height=3.5in]{index_files/figure-latex/dot-figure-1.png}
 
 }
 
@@ -210,6 +258,153 @@ analysis}
 \textsubscript{Source:
 \href{https://agdamsbo.github.io/svd-modification/index.qmd.html}{Article
 Notebook}}
+
+Baseline characteristics are included with the Table~\ref{tbl-baseline}.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2619}}
+  >{\centering\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2619}}
+  >{\centering\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2500}}
+  >{\centering\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2262}}@{}}
+
+\caption{\label{tbl-baseline}Baseline values SVD burden score}
+
+\tabularnewline
+
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\textbf{Characteristic}
+\end{minipage} & \begin{minipage}[b]{\linewidth}\centering
+\textbf{Overall}, N = 765
+\end{minipage} & \begin{minipage}[b]{\linewidth}\centering
+\textbf{Female}, N = 280
+\end{minipage} & \begin{minipage}[b]{\linewidth}\centering
+\textbf{Male}, N = 485
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+SVD score & & & \\
+0 & 302 (39\%) & 105 (38\%) & 197 (41\%) \\
+1 & 216 (28\%) & 75 (27\%) & 141 (29\%) \\
+2 & 142 (19\%) & 61 (22\%) & 81 (17\%) \\
+3 & 71 (9.3\%) & 29 (10\%) & 42 (8.7\%) \\
+4 & 34 (4.4\%) & 10 (3.6\%) & 24 (4.9\%) \\
+Age & 71 (62, 79) & 75 (64, 80) & 70 (61, 77) \\
+Admission NIHSS & 4.0 (2.0, 7.0) & 4.0 (2.0, 8.0) & 3.0 (2.0, 7.0) \\
+Treated with tPA & 460 (60\%) & 159 (57\%) & 301 (62\%) \\
+Treated with EVT & 100 (13\%) & 30 (11\%) & 70 (14\%) \\
+Pre-stroke PASE score & 108 (60, 161) & 89 (55, 136) & 116 (71, 175) \\
+Living alone & 203 (27\%) & 120 (43\%) & 83 (17\%) \\
+
+\end{longtable}
+
+\textsubscript{Source:
+\href{https://agdamsbo.github.io/svd-modification/index.qmd.html}{Article
+Notebook}}
+
+Scoring reliability between raters has been compared using different
+metrics, to show different nuances to the performance, see
+Table~\ref{tbl-irr}. The main performance measure is the intraclass
+correlation ceofficient.
+
+\begin{longtable}{lrrrrr}
+
+\caption{\label{tbl-irr}Inter rater reliability testing}
+
+\tabularnewline
+
+\toprule
+Variable & Agreement & Krippendorffs\_Alpha & Fleiss\_Kappa & Brennan\_Predigers\_Kappa & IntraclCorrCoef \\ 
+\midrule\addlinespace[2.5pt]
+microbleed & $0.90$ & $0.65$ & $0.65$ & $0.80$ & $0.65$ \\ 
+lacunes & $0.83$ & $0.56$ & $0.56$ & $0.66$ & $0.56$ \\ 
+wmh & $0.88$ & $0.72$ & $0.72$ & $0.75$ & $0.72$ \\ 
+atrophy & $0.81$ & $0.54$ & $0.54$ & $0.63$ & $0.54$ \\ 
+score & $0.62$ & $0.46$ & $0.46$ & $0.52$ & $0.75$ \\ 
+\bottomrule
+
+\end{longtable}
+
+\textsubscript{Source:
+\href{https://agdamsbo.github.io/svd-modification/index.qmd.html}{Article
+Notebook}}
+
+Below is the initial evaluation of possible PA effect modification on
+classical risk factors, Table~\ref{tbl-olr}. These results indicates no
+effect modification as odds ratios are largely unchanged, when PA is
+introduced in the model (on the right). This may not be the optimal
+method for this kind of evaluation, though.
+
+\begin{table}
+
+\caption{\label{tbl-olr}Multivariate, ordianal, logistic regression
+analysis without and with PASE score included}
+
+\centering{
+
+\includegraphics{index_files/figure-pdf/tbl-olr-1.pdf}
+
+}
+
+\end{table}%
+
+\textsubscript{Source:
+\href{https://agdamsbo.github.io/svd-modification/index.qmd.html}{Article
+Notebook}}
+
+Based on the preliminary SVD-scores, SVD score distribution stratified
+by PA quartile is presented in Figure~\ref{fig-svd_dist}.
+
+\phantomsection\label{cell-fig-svd_dist}
+\begin{figure}[H]
+
+\centering{
+
+\captionsetup{labelsep=none}\includegraphics{index_files/figure-pdf/fig-svd_dist-1.pdf}
+
+}
+
+\caption{\label{fig-svd_dist}}
+
+\end{figure}%
+
+\textsubscript{Source:
+\href{https://agdamsbo.github.io/svd-modification/index.qmd.html}{Article
+Notebook}}
+
+\subsection{Discussion}\label{discussion}
+
+The numbers and figures presented here are very much preliminary and
+should only be used for discussion and inspiration. Also, if you have
+any interest in collaboration, please reach out!
+
+\phantomsection\label{refs}
+\begin{CSLReferences}{1}{0}
+\bibitem[\citeproctext]{ref-landman2021}
+Landman, Thijs Rj, Dick Hj Thijssen, Anil M. Tuladhar, and Frank-Erik de
+Leeuw. 2021. {``Relation between physical activity and cerebral small
+vessel disease: A nine-year prospective cohort study.''}
+\emph{International Journal of Stroke: Official Journal of the
+International Stroke Society} 16 (8): 962--71.
+\url{https://doi.org/10.1177/1747493020984090}.
+
+\bibitem[\citeproctext]{ref-moniruzzaman2020}
+Moniruzzaman, Mohammad, Aya Kadota, Hiroyoshi Segawa, Keiko Kondo,
+Sayuki Torii, Naoko Miyagawa, Akira Fujiyoshi, et al. 2020.
+{``Relationship Between Step Counts and Cerebral Small Vessel Disease in
+Japanese Men.''} \emph{Stroke} 51 (12): 3584--91.
+\url{https://doi.org/10.1161/STROKEAHA.120.030141}.
+
+\bibitem[\citeproctext]{ref-torres2019}
+Torres, Elisa R., Siobhan M. Hoscheidt, Barbara B. Bendlin, Vincent A.
+Magnotta, Gabriel D. Lancaster, Roger L. Brown, and Sergio Paradiso.
+2019. {``Lifetime Physical Activity and White Matter Hyperintensities in
+Cognitively-Intact Adults.''} \emph{Nursing Research} 68 (3): 210--17.
+\url{https://doi.org/10.1097/NNR.0000000000000341}.
+
+\end{CSLReferences}
 
 
 

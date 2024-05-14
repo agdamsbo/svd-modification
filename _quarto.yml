@@ -16,7 +16,7 @@ format:
   # pdf: default
 
 execute:
-  freeze: true
+  freeze: false
   eval: true
   echo: false
   message: false
@@ -39,6 +39,49 @@ authors:
     affiliations:
       - ref: dsc
       - ref: dcm
+    roles:
+      - data collection
+  - name: Sigrid Breinholt Vestergaard
+    affiliations:
+      - ref: dsc
+      - ref: dcm
+    roles:
+      - data collection
+  - name: Niels Lech Pedersen
+    affiliations:
+      - ref: dcm
+    roles:
+      - data collection
+  - name: Kim Morgenstjerne Østerskov
+    affiliations:
+      - ref: dsc
+      - ref: dcm
+    roles:
+      - data collection
+  - name: Mette Foldager Hindsholm
+    affiliations:
+      - ref: dsc
+      - ref: dcm
+    roles:
+      - data collection
+  - name: Arzu Bilgin-Freiert
+    affiliations:
+      - ref: dsc
+      - ref: dcm
+    roles:
+      - data collection
+  - name: Claus Ziegler Simonsen
+    affiliations:
+      - ref: dsc
+      - ref: dcm
+    roles:
+      - data collection
+  - name: Rikke Beese Dalby
+    affiliations:
+      - ref: sduh
+      - ref: dcm
+    roles:
+      - data collection
   - name: Grethe Andersen
     affiliations:
       - ref: dsc
@@ -66,6 +109,12 @@ affiliations:
     city: Aarhus
     country: Denmark
     url: https://www.stenoaarhus.dk/
+  - id: sduh
+    name: South Denmark University Hospital
+    department: Radiology
+    city: Esbjerg
+    country: Denmark
+    url: https://regionsyddanmark.dk/fagfolk/forskning/syddansk-universitetshospital
 
 
 

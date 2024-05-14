@@ -59,8 +59,29 @@ list(
   ),
   tar_target(
     name = flowchart_dot,
-    command = create_flowchart(ls_data),
+    command = create_flowchart(ls_data,export.path = here::here("images/flow.dot")),
     description = "Flowchart dot file export for better plotting"
     # format = "qs" # Efficient storage for general data objects.
+  ),
+  tar_target(
+    name = flowchart_clin,
+    command = clinical_flowchart(df_complete,export.path = here::here("images/flow_main.dot")),
+    description = "Flowchart dot file export for better plotting"
+    # format = "qs" # Efficient storage for general data objects.
+  ),
+  tar_target(
+    name = complete_scores,
+    command = final_score(ls_data),
+    description = "Tibble of merged SVD scores with consensus assessments"
+  ),
+  tar_target(
+    name = clin_data,
+    command = clin_data_all(),
+    description = "Clinical data acquisition"
+  ),
+  tar_target(
+    name = df_complete,
+    command = dplyr::left_join(clin_data,cut_scores(data = complete_scores, prefix = "")),
+    description = "Joined data set of SVD scores and clinical data"
   )
 )
