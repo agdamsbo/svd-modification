@@ -52,6 +52,9 @@ Please refer to @fig-flowchart for an overview of subjects included for analysis
 //| file: images/flow_main.dot
 ```
 
+
+
+
 ```{r}
 #| fig-cap: Skimmed overview of SVD scoring
 #| include: false

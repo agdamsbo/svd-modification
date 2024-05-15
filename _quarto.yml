@@ -1,5 +1,6 @@
 project:
   type: manuscript
+  output-dir: _site
 
 manuscript:
   article: index.qmd
@@ -16,7 +17,7 @@ format:
   # pdf: default
 
 execute:
-  freeze: false
+  freeze: true
   eval: true
   echo: false
   message: false
