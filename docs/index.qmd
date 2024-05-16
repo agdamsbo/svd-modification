@@ -1,0 +1,265 @@
+---
+title: |
+  Physical activity as an effect modificator of lifestyle factors on small vessel deisease burden
+bibliography: references.bib
+abstract: |
+  **Background and aims** 
+  Physical activity (PA) may reduce the development of small vessel disease (SVD). The effect of physical activity and more classical vascular risk factors such as hypertension and diabetes in the development of SVD is debated, however. We aim to investigate the effect modification of physical activity on traditional vascular risk factors and the burden of small vessel disease among acute ischemic stroke patients.
+  
+  **Methods**
+  We have pooled patients from two clinical trials on acute ischemic stroke treatment. The main outcome is an ordinal scale score of quantified MR biomarkers of small vessel disease (SVD) burden based on visually assessed acute stroke scans (T2* or SWI and FLAIR sequences). Biomarkers includes microbleeds, old lacunar infarcts, superficial siderosis, white matter hyperintensities and atrophy. Covariates includes age, sex, pre-stroke physical activity, diabetes, hypertension, atrial fibrillation and previous cardiovascular diseases. 
+  Pre-stroke PA was assessed with a questionnaire on inclusion within a few days after stroke onset. Data will be analyzed using bivariate and multivariate linear regression analysis.
+
+  **Results**
+  We expect to include a total of around 1000 adult patients admitted to the comprehensive stroke centre at Aarhus University Hospital between 2013-2022. Preliminary results will be presented at ESOC 2024.
+  
+  **Conclusions**
+  Physical activity may be an important factor in modifying the risk of SVD development in stroke patients.
+---
+
+```{r setup}
+source(here::here("R/functions.R"))
+```
+
+## Introduction
+
+THe correlation between physical activity, small vessel disease and classical risk factors is very much debated and not fully understood.[@moniruzzaman2020; @torres2019; @landman2021]
+
+In this abstract, we present the preliminary results from our pooled SVD study, also presented at [ESOC 2024](https://apps.congrex.com/esoc2024/en-GB/pag/presentation/362937).
+
+## Methods
+
+This study is a cross-sectional study, based on a pooled dataset from two different randomised, clinical trials on patients with acute stroke.
+
+## Results
+
+Please refer to @fig-flowchart for an overview of subjects included for analysis.
+
+<!-- ```{dot} -->
+
+<!-- //| label: fig-flowchart_scores -->
+
+<!-- //| fig-cap: "Flowchart of subject included for analysis" -->
+
+<!-- //| include: false -->
+
+<!-- //| file: images/flow.dot -->
+
+<!-- ``` -->
+
+```{dot}
+//| label: fig-flowchart
+//| fig-cap: "Flowchart of subject included for analysis"
+//| file: images/flow_main.dot
+```
+
+
+
+
+```{r}
+#| fig-cap: Skimmed overview of SVD scoring
+#| include: false
+skimr::skim(targets::tar_read("complete_scores") |> (\(.i){
+  .i |> dplyr::mutate(dplyr::across(names(.i)[-c(1:2)], ~ factor(.x)))
+})())
+```
+
+Baseline characteristics are included with the @tbl-baseline.
+
+```{r}
+#| label: tbl-simple-score
+#| tbl-cap: Simple score table overview
+#| include: false
+targets::tar_read("complete_scores") |>
+  dplyr::select(-c("record_id", "user")) |>
+  dplyr::mutate(dplyr::across(
+    dplyr::all_of(c("microbleed", "lacunes")),
+    ~ factor(.x,
+      levels = .x |>
+        dsub("^>", "9r_") |>
+        as.factor() |>
+        levels() |>
+        dsub("^9r_", ">")
+    )
+  )) |>
+  gtsummary::tbl_summary()
+```
+
+```{r}
+#| include: false
+targets::tar_read("clin_data") |>
+  dplyr::select(-record_id, -trial_id, -inclusion_date) |>
+  gtsummary::tbl_summary(by = trial)
+```
+
+```{r}
+#| label: tbl-baseline
+#| tbl-cap: Baseline values SVD burden score
+targets::tar_read("df_complete") |>
+  dplyr::filter(!is.na(pase_0), !is.na(simple_score)) |>
+  get_vars(c("pre", "clin")) |>
+  # dplyr::mutate(female_sex = dplyr::if_else(female_sex, "Female", "Male")) |>
+  dplyr::transmute(simple_score, age, female_sex= dplyr::if_else(female_sex, "Female", "Male"), nihss, tpa, evt, pase_0, alone) |>
+  labelling_data() |>
+  gtsummary::tbl_summary(by = female_sex, missing = "no") |>
+  # gtsummary::add_p() |>
+  gtsummary::add_overall()
+```
+
+Scoring reliability between raters has been compared using different metrics, to show different nuances to the performance, see @tbl-irr. The main performance measure is the intraclass correlation ceofficient.
+
+```{r}
+#| label: tbl-irr
+#| tbl-cap: Inter rater reliability testing
+targets::tar_read("ls_data") |>
+  purrr::pluck("svd_score") |>
+  dplyr::filter(svd_perf == "Ja", redcap_repeat_instance %in% 1:2) |>
+  dplyr::select(record_id, redcap_repeat_instance, svd_microbleed, svd_lacunes, svd_wmh, svd_atrophy) |>
+  simple_score() |>
+  tibble::as_tibble() |>
+  irr_icc_calc() |>
+  gt::gt() |>
+  gt::fmt_number(n_sigfig = 2)
+```
+
+Below is the initial evaluation of possible PA effect modification on classical risk factors, @tbl-olr. These results indicates no effect modification as odds ratios are largely unchanged, when PA is introduced in the model (on the right). This may not be the optimal method for this kind of evaluation, though.
+
+```{r}
+#| label: tbl-olr
+#| tbl-cap: Multivariate, ordianal, logistic regression analysis without and with PASE score included
+ls <- c(FALSE, TRUE) |>
+  purrr::map(main_analysis, get_vars(targets::tar_read("df_complete"), vars.groups = "poster") |>
+    dplyr::mutate(
+      simple_score = factor(simple_score)
+    )) |>
+  purrr::map(function(.x) fix_labels(.x)) |>
+  setNames(c("1 Without PA", "2 With PA"))
+
+p1 <- ls |>
+  purrr::imap(function(.x, .i) {
+    .x[["table_body"]] |>
+      dplyr::select(label, estimate, conf.low, conf.high) |>
+      dplyr::mutate(model = .i)
+  }) |>
+  dplyr::bind_rows() |>
+  dplyr::mutate(
+    label = factor(label, levels = rev(get_set_label("poster")[-1]))
+  ) |>
+  coef_forrest_plot(cols = viridis::viridis(7)[c(1,5)] )
+
+p1 + ggplot2::facet_wrap(facets = ggplot2::vars(model), ncol = 2)
+
+# p1 |> poster_coef_print(here::here("post.png"))
+```
+
+```{r}
+#| include: false
+p <- targets::tar_read("df_complete") |>
+  dplyr::transmute(simple_score,
+    hyperten = dplyr::if_else(hyperten, "Hypertension", "No hypertension"),
+    pase_0 = stRoke::quantile_cut(pase_0, groups = 2, group.names = c("Low PA level", "High PA level"))
+  ) |>
+  table() |>
+  rankinPlot::grottaBar(
+    scoreName = "simple_score",
+    groupName = "hyperten",
+    strataName = "pase_0",
+    textColor = c("black", "white"),
+    textCut = 3,
+    printNumbers = "count"
+  ) +
+  ggplot2::labs(fill = "SVD score") +
+  viridis::scale_fill_viridis(discrete = TRUE, direction = -1, option = "viridis")
+p
+```
+
+Based on the preliminary SVD-scores, SVD score distribution stratified by PA quartile is presented in @fig-svd_dist.
+
+```{r}
+#| label: fig-svd_dist
+#| tbl-cap: Distribution of SVD scores stratified by physical activity quartile
+#| include: true
+# renv::install("agdamsbo/rankinPlot")
+p <- targets::tar_read("df_complete") |>
+  dplyr::transmute(simple_score,
+    pase_0 = stRoke::quantile_cut(pase_0,
+      groups = 4,
+      group.names = glue::glue("Q{1:4}")
+    )
+  ) |>
+  table() |>
+  rankinPlot::grottaBar(
+    scoreName = "simple_score",
+    groupName = "pase_0",
+    textColor = c("black", "white"),
+    textCut = 3,
+    printNumbers = "none",
+    lineColor = "black",
+    lineSize = 1,
+    drawLines = FALSE,
+    returnData = TRUE
+  ) |>
+  (\(.x){
+    .x$plot + ggplot2::geom_text(data = .x$rectData[which(.x$rectData$n >
+  0), ],
+  # size = 6,
+  fontface = "plain", ggplot2::aes(
+  x = group,
+  y = p_prev + 0.49 * p, color = as.numeric(score) >
+    2,
+  # label = paste0(sprintf("%2.0f", 100 * p),"%"),
+  label = paste0(sprintf("%2.0f", 100 * p), "%")
+)) +
+  ggplot2::labs(fill = "SVD score") +
+  ggplot2::ylab("Physical activity level")+
+  viridis::scale_fill_viridis(discrete = TRUE, direction = -1, option = "D")
+  })()
+p
+```
+
+```{r}
+#| include: false
+ggplot2::ggsave(
+  filename = here::here("grotta_pa_svd.png"),
+  p +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      legend.position = "none",
+      panel.grid.major = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.border = ggplot2::element_blank(),
+      panel.grid = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_blank(),
+      axis.title.y = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_blank(),
+      axis.title.x = ggplot2::element_blank(),
+      text = ggplot2::element_text(size = 25),
+      plot.title = ggplot2::element_text(),
+      panel.background = ggplot2::element_blank()
+    ),
+  units = "cm",
+  width = 65,
+  height = 12,
+)
+```
+
+```{r}
+#| include: false
+targets::tar_read("df_complete") |>
+  get_vars(vars.groups = c("pre")) |>
+  (\(ds){
+    genodds::genodds(response = ds$simple_score, group = stRoke::quantile_cut(ds$pase_0, groups = 2, group.names = c("low", "high")), strata = ds$diabetes)
+  })()
+
+
+targets::tar_read("df_complete") |>
+  get_vars(vars.groups = c("pre","post")) |>
+  (\(ds){
+    genodds::genodds(response = ds$mrs_eos, group = ds$simple_score == 0, strata = ds$active_treatment)
+  })()
+
+```
+
+## Discussion
+
+The numbers and figures presented here are very much preliminary and should only be used for discussion and inspiration. Also, if you have any interest in collaboration, please reach out!
