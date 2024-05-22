@@ -138,13 +138,13 @@ ls <- c(FALSE, TRUE) |>
 p1 <- ls |>
   purrr::imap(function(.x, .i) {
     .x[["table_body"]] |>
-      dplyr::select(label, estimate, conf.low, conf.high) |>
+      # dplyr::select(label, estimate, conf.low, conf.high) |>
       dplyr::mutate(model = .i)
   }) |>
   dplyr::bind_rows() |>
   dplyr::mutate(
     label = factor(label, levels = rev(get_set_label("poster")[-1]))
-  ) |>
+  ) |> 
   coef_forrest_plot(cols = viridis::viridis(7)[c(1,5)] )
 
 p1 + ggplot2::facet_wrap(facets = ggplot2::vars(model), ncol = 2)

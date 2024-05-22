@@ -15,10 +15,10 @@ label6 -> label7 -> label8;
   node [shape = rectangle, fillcolor = Biege, style="", fillcolor = "", color = ""]
 
 node1 [label = "All subjects (n=1055)"]
-node2 [label = "No MR (n=175):\l• No acute MR performed (n=169)\l• Not assessed (n=3)\l• Other reasons (n=3)\l"]
-node3 [label = "Patients considered (n=880)"]
+node2 [label = "No MR (n=176):\l• No acute MR performed (n=169)\l• Not assessed (n=4)\l• Other reasons (n=3)\l"]
+node3 [label = "Patients considered (n=879)"]
 node4 [label = "No PASE available (n=115):\l• Missing (n=115)\l"]
-node5 [label = "Patients included (n=765)"]
+node5 [label = "Patients included (n=764)"]
 
 
 ## Invisible point node for joints

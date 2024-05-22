@@ -678,7 +678,7 @@ clin_data_all <- function() {
       )
     }) |>
     purrr::map(dplyr::left_join, dplyr::select(data_svd, dplyr::all_of(c("record_id", "trial_id")))) |>
-    dplyr::bind_rows() |> 
+    dplyr::bind_rows() |>
     dplyr::mutate(
       pase_0_high = pase_0 > median(as.numeric(pase_0), na.rm = TRUE)
     )
@@ -739,7 +739,7 @@ cut_scores <- function(data,
 
 
 dsub <- function(data, pattern, replacement) {
-  gsub(pattern = pattern, replacement = replacement, x = data, )
+  gsub(pattern = pattern, replacement = replacement, x = data)
 }
 
 
@@ -929,6 +929,7 @@ inter_rater_calc <- function(data, coder_var = redcap_repeat_instance) {
     unit_var = record_id,
     coder_var = {{ coder_var }},
     holsti = FALSE,
+    kripp_alpha = FALSE,
     fleiss_kappa = TRUE,
     brennan_prediger = TRUE,
     na.omit = TRUE
@@ -1042,7 +1043,9 @@ var_labels <- function() {
     event.include = "Include event",
     who_0 = "Pre-stroke WHO-5 score",
     mrs_0_above0 = "Pre-stroke mRS > 0",
-    mrs_eos = "mRS at End of Study"
+    mrs_eos = "mRS at End of Study",
+    active_treatment = "Active treatment",
+    trial = "Clinical trial"
   )
 }
 
@@ -1125,58 +1128,60 @@ main_analysis <- function(include.pase = FALSE, data) {
     )
 }
 
-coef_forrest_plot <- function(data,
-                              cols = c(
-                                "#CE0045",
-                                "#66c1a3"
-                              ),
-                              x.tics = create_log_tics(c(.2, .4, .6, .8, 1)),
-                              legend.title = "") {
-  p1 <- data |>
-    # dplyr::filter(name=="decrease") |>
-    ggplot2::ggplot(ggplot2::aes(
-      x = log(estimate),
-      y = label,
-      color = model,
-      fill = model
-    )) +
-    ggplot2::geom_vline(ggplot2::aes(xintercept = 0), linewidth = .5, linetype = "dashed") +
-    ggplot2::geom_errorbar(ggplot2::aes(
-      x = log(estimate), xmin = log(conf.low),
-      xmax = log(conf.high)
-    ), 
-    position = ggplot2::position_dodge(width = 0.5), 
-    width = .2,
-    linewidth=2,
-    lineend = "round")+
-    ggplot2::geom_point( # ggplot2::aes(shape = model),
-      size = 8,
-      shape = 18,
-      position = ggplot2::position_dodge(width = 0.5)
-    )  +
-    ggplot2::scale_x_continuous(
-      breaks = log(x.tics),
-      labels = x.tics,
-      limits = log(range(x.tics))
-    ) +
-    ggplot2::scale_color_manual(values = cols) +
-    ggplot2::scale_fill_manual(values = cols) +
-    # ggplot2::scale_shape_manual(values = c(1, 1)) +
-    ggplot2::theme_bw() +
-    ggplot2::theme(
-      panel.grid.minor = ggplot2::element_blank(),
-      # legend.title = ggplot2::element_text(""),
-      legend.position = "bottom"
-    ) +
-    ggplot2::ylab("") +
-    ggplot2::xlab("Odds ratio (log)") +
-    ggplot2::labs(
-      # shape = legend.title,
-      color = legend.title,
-      fill = legend.title
-    )
-  p1
-}
+# coef_forrest_plot <- function(data,
+#                               cols = c(
+#                                 "#CE0045",
+#                                 "#66c1a3"
+#                               ),
+#                               x.tics = create_log_tics(c(.2, .4, .6, .8, 1)),
+#                               legend.title = "") {
+#   p1 <- data |>
+#     # dplyr::filter(name=="decrease") |>
+#     ggplot2::ggplot(ggplot2::aes(
+#       x = log(estimate),
+#       y = label,
+#       color = model,
+#       fill = model
+#     )) +
+#     ggplot2::geom_vline(ggplot2::aes(xintercept = 0), linewidth = .5, linetype = "dashed") +
+#     ggplot2::geom_errorbar(
+#       ggplot2::aes(
+#         x = log(estimate), xmin = log(conf.low),
+#         xmax = log(conf.high)
+#       ),
+#       position = ggplot2::position_dodge(width = 0.5),
+#       width = .2,
+#       linewidth = 2,
+#       lineend = "round"
+#     ) +
+#     ggplot2::geom_point( # ggplot2::aes(shape = model),
+#       size = 8,
+#       shape = 18,
+#       position = ggplot2::position_dodge(width = 0.5)
+#     ) +
+#     ggplot2::scale_x_continuous(
+#       breaks = log(x.tics),
+#       labels = x.tics,
+#       limits = log(range(x.tics))
+#     ) +
+#     ggplot2::scale_color_manual(values = cols) +
+#     ggplot2::scale_fill_manual(values = cols) +
+#     # ggplot2::scale_shape_manual(values = c(1, 1)) +
+#     ggplot2::theme_bw() +
+#     ggplot2::theme(
+#       panel.grid.minor = ggplot2::element_blank(),
+#       # legend.title = ggplot2::element_text(""),
+#       legend.position = "bottom"
+#     ) +
+#     ggplot2::ylab("") +
+#     ggplot2::xlab("Odds ratio (log)") +
+#     ggplot2::labs(
+#       # shape = legend.title,
+#       color = legend.title,
+#       fill = legend.title
+#     )
+#   p1
+# }
 
 poster_coef_print <- function(plot, path) {
   x.tics <- create_log_tics(c(.2, .6, 1))
@@ -1205,7 +1210,7 @@ poster_coef_print <- function(plot, path) {
 #'
 #' @return ggplot object list
 #' @export
-theme_poster <- function(plot, text=ggplot2::element_text(size = 25) ,bg=ggplot2::element_rect(colour = "white")){
+theme_poster <- function(plot, text = ggplot2::element_text(size = 25), bg = ggplot2::element_rect(colour = "white")) {
   ggplot2::theme(
     legend.position = "none",
     # panel.grid.major = ggplot2::element_blank(),
@@ -1237,3 +1242,176 @@ get_label <- function(vars = "pase_0") {
 get_set_label <- function(set) {
   get_label(get_var_vec(set))
 }
+
+#' Forrest plot based on gtsummary tables
+#'
+#' @param data data table from gtsummary.
+#' @param cols Colors. Will be used if column "model" is present.
+#' @param x.tics numeric vector of tics. Use create_log_tics().
+#' @param legend.title Title for the legend
+#'
+#' @return ggplot list object
+#' @export
+#'
+#' @examples
+#' stRoke::talos |>
+#'   dplyr::mutate(mrs_6 = factor(mrs_6)) |>
+#'   dplyr::select(-mrs_1) |>
+#'   (\(.x){
+#'     MASS::polr(mrs_6 ~ .,
+#'       data = .x, Hess = TRUE,
+#'       method = "logistic"
+#'     )
+#'   })() |>
+#'   gtsummary::tbl_regression(
+#'     exponentiate = TRUE
+#'   ) |> 
+#'   #purrr::pluck("table_body") |>
+#'   coef_forrest_plot(x.tics = create_log_tics(c(.2, 1)))
+coef_forrest_plot <- function(data,
+                              cols = c(
+                                "#CE0045",
+                                "#66c1a3"
+                              ),
+                              x.tics = create_log_tics(c(.2, .4, .6, .8, 1)),
+                              legend.title = "") {
+  
+  if ("gtsummary" %in% class(data)){
+    data <- purrr::pluck(data,"table_body")
+  }
+  
+  assertthat::assert_that("tbl_df" %in% class(data))
+
+  ds <- data |>
+    (\(.x){
+      if (!"model" %in% names(.x)) {
+        .x$model <- 1
+      }
+      split(.x, .x$model)
+    })() |>
+    purrr::map(function(.x) {
+      .x |>
+        dplyr::mutate(
+          variable = factor(variable, levels = unique(variable))
+        ) |>
+        (\(.x){
+          split(.x, .x$variable)
+        })() |>
+        purrr::map(function(.x) {
+          if (nrow(.x) > 1) {
+            .x[-1, ] |>
+              dplyr::mutate(label = paste(.x[["label"]][1], label))
+          } else {
+            .x
+          }
+        }) |>
+        dplyr::bind_rows() |>
+        dplyr::mutate(
+          estimate = dplyr::if_else(reference_row, 1, estimate,missing=estimate),
+          label = factor(label, levels = rev(label))
+        )
+    }) |>
+    dplyr::bind_rows()
+
+  
+  if ("model" %in% names(data)) {
+    p1 <- ds |>
+      dplyr::mutate(model=factor(model,levels=rev(unique(model)))) |> 
+      # dplyr::filter(name=="decrease") |>
+      ggplot2::ggplot(ggplot2::aes(
+        x = log(estimate),
+        y = label,
+        color = model,
+        fill = model
+      ))
+  } else {
+    p1 <- ds |>
+      # dplyr::filter(name=="decrease") |>
+      ggplot2::ggplot(ggplot2::aes(
+        x = log(estimate),
+        y = label
+      ))
+  }
+
+  p1 <- p1 +
+    ggplot2::geom_vline(ggplot2::aes(xintercept = 0), linewidth = .5, linetype = "dashed") +
+    ggplot2::geom_errorbar(
+      ggplot2::aes(
+        x = log(estimate), xmin = log(conf.low),
+        xmax = log(conf.high)
+      ),
+      position = ggplot2::position_dodge(width = 0.5),
+      width = .2,
+      linewidth = 2,
+      lineend = "round"
+    ) +
+    ggplot2::geom_point( # ggplot2::aes(shape = model),
+      size = 8,
+      shape = 18,
+      position = ggplot2::position_dodge(width = 0.5)
+    ) +
+    ggplot2::scale_x_continuous(
+      breaks = log(x.tics),
+      labels = x.tics,
+      limits = log(range(x.tics))
+    ) +
+    # ggplot2::scale_shape_manual(values = c(1, 1)) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+      panel.grid.minor = ggplot2::element_blank(),
+      # legend.title = ggplot2::element_text(""),
+      legend.position = "bottom"
+    ) +
+    ggplot2::ylab("") +
+    ggplot2::xlab("Odds ratio (log)") +
+    ggplot2::labs(
+      # shape = legend.title,
+      color = legend.title,
+      fill = legend.title
+    )
+
+  if (is.null(cols)) {
+    p1
+  } else {
+    p1 +
+      ggplot2::scale_color_manual(values = cols) +
+      ggplot2::scale_fill_manual(values = cols)
+  }
+}
+
+#' Pivot merged gtsummary table for plotting coefficients
+#'
+#' @param data list of merged gtsummary tables
+#'
+#' @return tibble
+#' @export 
+#'
+pivot_gtsummary_long <- function(data){
+  assertthat::assert_that("tbl_merge" %in% class(data))
+  
+  data |>
+    purrr::pluck("table_body") |>
+    (\(.x){
+      dplyr::select(.x, grep("_\\d+$", names(.x)))
+    })() |>
+    (\(.x){
+      f <- REDCapCAST::strsplitx(names(.x), "\\d+$", "before") |>
+        purrr::map(function(.y) .y[2]) |>
+        purrr::list_c() |>
+        factor()
+      split.default(.x, f) |>
+        purrr::map(function(.y) setNames(.y, strsplit(names(.y), "_\\d+$"))) |>
+        setNames(names(purrr::pluck(data, "tbls"))) |>
+        purrr::imap(function(.z, .i) dplyr::mutate(.z, model = .i)) |>
+        purrr::map(function(.n) {
+          dplyr::bind_cols(
+            data |>
+              purrr::pluck("table_body") |>
+              (\(.m){
+                dplyr::select(.m, !grep("_\\d+$", names(.m)))
+              })(),
+            .n
+          )
+        }) |>
+        dplyr::bind_rows()
+    })()}

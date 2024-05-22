@@ -31,7 +31,9 @@ Imports:
     targets,
     tidycomm,
     usethis,
-    viridis
+    viridis,
+    mgcv,
+    survey
 URL: https://github.com/agdamsbo/svd-modification
 BugReports: https://github.com/agdamsbo/svd-modification/issues
 Suggests: 

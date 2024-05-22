@@ -1,0 +1,80 @@
+
+```{r setup}
+source(here::here("R/functions.R"))
+```
+
+
+```{r}
+ds <- get_vars(targets::tar_read("df_complete"), vars.groups = c("pre", "clin", "post")) |>
+  dplyr::mutate(pase_0 = stRoke::quantile_cut(pase_0, groups = 4, group.names = paste0("Q", 1:4)))
+
+tbl.olr <- ds |>
+  dplyr::mutate(dplyr::across(tidyselect::all_of(c("mrs_eos", "simple_score")), ~ factor(.x))) |>
+  (\(.x){
+    MASS::polr(mrs_eos ~ .,
+      data = .x, Hess = TRUE,
+      method = "logistic"
+    )
+  })() |>
+  gtsummary::tbl_regression(
+    show_single_row = dplyr::where(is.logical),
+    exponentiate = TRUE,
+    tidy_fun = purrr::partial(gtsummary::tidy_robust, vcov_args = list())
+  )
+
+tbl.olr.uv <- ds |>
+  dplyr::mutate(dplyr::across(tidyselect::all_of(c("mrs_eos", "simple_score")), ~ factor(.x))) |>
+  gtsummary::tbl_uvregression(
+    method = MASS::polr,
+    method.args = list(
+      Hess = TRUE,
+      method = "logistic"
+    ),
+    y = mrs_eos,
+    show_single_row = dplyr::where(is.logical),
+    exponentiate = TRUE,
+    tidy_fun = purrr::partial(gtsummary::tidy_robust, vcov_args = list())
+  )
+
+
+ds |>
+  dplyr::select(simple_score, age, female_sex, pase_0, nihss, trial) |>
+  dplyr::mutate(
+    trial = factor(trial),
+    dplyr::across(dplyr::everything(), ~ as.numeric(.x))
+  ) |>
+  pairs()
+```
+
+```{r}
+tbl.olr |>
+  fix_labels() |>
+  coef_forrest_plot(cols = viridis::viridis(7)[c(1, 5)])
+```
+
+```{r}
+list(
+  uv = tbl.olr.uv,
+  multi = tbl.olr
+) |>
+  purrr::imap(function(.x, .i) {
+    .x |>
+      fix_labels() |>
+      purrr::pluck("table_body") |>
+      dplyr::mutate(model = .i)
+  }) |>
+  dplyr::bind_rows() |>
+  View()
+coef_forrest_plot(x.tics = create_log_tics(c(7, .4, .6, .8, 1)))
+```
+
+```{r}
+list(
+  uv = tbl.olr.uv,
+  multi = tbl.olr
+) |>
+  gtsummary::tbl_merge() |>
+  fix_labels() |>
+  pivot_gtsummary_long() |>
+  coef_forrest_plot(x.tics = create_log_tics(c(7, .4, .6, .8, 1)))
+```
