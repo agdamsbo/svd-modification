@@ -1,0 +1,45 @@
+---
+title: "DAGs on PA effect modification on SVD in stroke"
+format: 
+  # docx:
+  #   fig-dpi: 300
+  html: default
+execute: 
+  echo: false
+  warning: false
+  messages: false
+---
+
+```{r setup}
+source(here::here("R/functions.R"))
+```
+
+
+## Relevant DAGs definition
+
+```{r}
+p_dags <- dags_list()[c(5, 1, 2, 3)] |>
+  purrr::map(dags_plot) |>
+  purrr::map(\(.x){
+    .x +
+      ggplot2::theme(
+        plot.tag.position = c(.05, .98),
+        plot.tag = ggplot2::element_text(hjust = 0, vjust = .1, size = 14)
+      )
+  }) |>
+  (\(.x){
+    # browser()
+    .x |>
+      patchwork::wrap_plots(ncol = 2) +
+      # patchwork::plot_layout(tag_level = 'new') +
+      patchwork::plot_annotation(tag_levels = list(glue::glue("{LETTERS[seq_along(.x)]}: {keyed_dict_lookup(names(.x),dags_names())}")))
+
+    # list(marquee::marquee_glue("**{LETTERS[seq_along(.x)]}**: {keyed_dict_lookup(names(.x),dags_names())}"))
+    # list(paste0("**",LETTERS[seq_along(.x)],"**",": ", keyed_dict_lookup(names(.x),dags_names())))
+  })()
+
+p_dags
+
+set.seed(3)
+ggplot2::ggsave(filename = "dags_panel.png", plot = p_dags, width = 180, height = 120, units = "mm", dpi = 600)
+```

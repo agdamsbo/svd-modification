@@ -1,0 +1,36 @@
+```{r setup}
+source(here::here("R/functions.R"))
+```
+
+```{r}
+ds_talos <- read.csv("/Volumes/Data/REDCap/DDV/talos_ddv.csv")
+ds <- ds_talos |>
+  dplyr::transmute(rnumb = as.character(rnumb), sdmt = talos_sdmt01a_4) |>
+  dplyr::right_join(targets::tar_read("df_complete") |> dplyr::filter(trial == "TALOS"), by = c("rnumb" = "trial_id"))
+```
+
+```{r}
+ds |> dplyr::transmute(
+  sdmt,
+  active_treatment,
+  age, 
+  female_sex, 
+  # pase_0, 
+  simple_score=simple_score>0
+) |> 
+  # (\(.x){
+  #   split(.x,.x$simple_score,drop = TRUE)
+  # })()|> 
+  # purrr::map(\(.x){
+  #   lm(sdmt~.,data=.x) |> 
+  #     gtsummary::tbl_regression()
+  # }) |> 
+  (\(.x){
+    lm(sdmt~active_treatment*simple_score+.,data=.x) |> 
+      gtsummary::tbl_regression()
+  })() #|> 
+  # (\(.x){
+  #   gtsummary::tbl_merge(tbls = .x,tab_spanner = names(.x))
+  # })()
+
+```

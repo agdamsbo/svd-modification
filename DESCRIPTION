@@ -33,7 +33,10 @@ Imports:
     usethis,
     viridis,
     mgcv,
-    survey
+    survey,
+    ggdag,
+    agdamsbo/rankinPlot,
+    marquee
 URL: https://github.com/agdamsbo/svd-modification
 BugReports: https://github.com/agdamsbo/svd-modification/issues
 Suggests: 

@@ -3,10 +3,24 @@
 source(here::here("R/functions.R"))
 ```
 
+```{r}
+get_vars(targets::tar_read("df_complete"), vars.groups = c("pre", "clin", "post")) |>
+  dplyr::mutate(pase_0 = stRoke::quantile_cut(pase_0, groups = 4, group.names = paste0("Q", 1:4))) |>
+  dplyr::select(simple_score, age, female_sex, pase_0, nihss, trial, year) |>
+  dplyr::mutate(
+    trial = factor(trial),
+    dplyr::across(dplyr::everything(), ~ as.numeric(.x))
+  ) |>
+  pairs()
+```
+
 
 ```{r}
 ds <- get_vars(targets::tar_read("df_complete"), vars.groups = c("pre", "clin", "post")) |>
-  dplyr::mutate(pase_0 = stRoke::quantile_cut(pase_0, groups = 4, group.names = paste0("Q", 1:4)))
+  (\(.x,g=4){
+    .x |> dplyr::mutate(pase_0 = stRoke::quantile_cut(pase_0, groups = g, group.names = paste0("Q", 1:g)))
+  })()
+  
 
 tbl.olr <- ds |>
   dplyr::mutate(dplyr::across(tidyselect::all_of(c("mrs_eos", "simple_score")), ~ factor(.x))) |>
@@ -35,15 +49,6 @@ tbl.olr.uv <- ds |>
     exponentiate = TRUE,
     tidy_fun = purrr::partial(gtsummary::tidy_robust, vcov_args = list())
   )
-
-
-ds |>
-  dplyr::select(simple_score, age, female_sex, pase_0, nihss, trial) |>
-  dplyr::mutate(
-    trial = factor(trial),
-    dplyr::across(dplyr::everything(), ~ as.numeric(.x))
-  ) |>
-  pairs()
 ```
 
 ```{r}
@@ -57,24 +62,46 @@ list(
   uv = tbl.olr.uv,
   multi = tbl.olr
 ) |>
-  purrr::imap(function(.x, .i) {
-    .x |>
-      fix_labels() |>
-      purrr::pluck("table_body") |>
-      dplyr::mutate(model = .i)
-  }) |>
-  dplyr::bind_rows() |>
-  View()
-coef_forrest_plot(x.tics = create_log_tics(c(7, .4, .6, .8, 1)))
+  gtsummary::tbl_merge() |> 
+  fix_labels() |> 
+  coef_forrest_plot(x.tics = create_log_tics(c(7, .4, .6, .8, 1)))
 ```
 
 ```{r}
-list(
-  uv = tbl.olr.uv,
-  multi = tbl.olr
-) |>
-  gtsummary::tbl_merge() |>
-  fix_labels() |>
-  pivot_gtsummary_long() |>
-  coef_forrest_plot(x.tics = create_log_tics(c(7, .4, .6, .8, 1)))
+targets::tar_read("df_complete") |>
+  dplyr::transmute(simple_score,
+    # pase_0 = stRoke::quantile_cut(pase_0,
+    #   groups = 4,
+    #   group.names = glue::glue("Q{1:4}")),
+    mrs_eos
+  ) |>
+  table() |>
+  rankinPlot::grottaBar(
+    scoreName = "simple_score",
+    groupName = "mrs_eos",
+    # groupName = "pase_0",
+    textColor = c("black", "white"),
+    textCut = 3,
+    printNumbers = "none",
+    lineColor = "black",
+    lineSize = 1,
+    drawLines = FALSE,
+    returnData = TRUE
+  ) |>
+  (\(.x){
+    .x$plot + ggplot2::geom_text(data = .x$rectData[which(.x$rectData$n >
+  0), ],
+  # size = 6,
+  fontface = "plain", ggplot2::aes(
+  x = group,
+  y = p_prev + 0.49 * p, color = as.numeric(score) >
+    2,
+  # label = paste0(sprintf("%2.0f", 100 * p),"%"),
+  label = paste0(sprintf("%2.0f", 100 * p), "%")
+)) +
+  ggplot2::labs(fill = "SVD score") +
+  ggplot2::ylab("Physical activity level")+
+  viridis::scale_fill_viridis(discrete = TRUE, direction = -1, option = "D")
+  })()
 ```
+

@@ -1,0 +1,161 @@
+---
+title: "SVD analyses and data exploration"
+format: 
+  docx:
+    fig-dpi: 300
+  # html: default
+execute: 
+  echo: false
+  warning: false
+  messages: false
+---
+
+```{r setup}
+library(see)
+# library(performance)
+# library(patchwork)
+source(here::here("R/functions.R"))
+df_all <- targets::tar_read(df_complete)
+
+df <- df_all |> dplyr::filter(include)
+
+df_format <- targets::tar_read(df_formatted)
+```
+
+These are the planned analyses, tables and figures for the main article.
+
+Drop all the questions and save them for a later specific publication.
+
+Agreed upon scoring overview:
+
+```{r}
+df_format |>
+  svd_systems_overview(
+    list.system = svd_scoring_systems(),
+    subset = match("huijts_simple_ext_svd", names(svd_scoring_systems()))
+  ) |>
+  # gtsummary::as_gt() |>
+  # gt::tab_header(title = "SVD scoring system")|>
+  gt_theme()
+```
+
+### Baseline table
+
+```{r}
+#| tbl-cap: Baseline factors
+baseline_table <- df_format |>
+  # get_vars(c("preds")) |>
+  dplyr::select(dplyr::all_of(purrr::pluck(model_input(), "main_exp"))) |>
+  # dplyr::mutate(female_sex = dplyr::if_else(female_sex, "Female", "Male")) |>
+  # dplyr::transmute(simple_score, age, female_sex= dplyr::if_else(female_sex, "Female", "Male"), nihss, tpa, evt, pase_0, alone) |>
+  labelling_data() |>
+  gtsummary::tbl_summary(
+    # by = trial,
+    missing = "no"
+  ) #|>
+# gtsummary::add_p() |>
+# gtsummary::add_overall()
+
+baseline_table |>
+  gtsummary::as_gt() |>
+  # gt::tab_header(title = "Baseline characteristics")|>
+  gt_theme()
+
+# baseline_table |>
+# gtsummary::add_p() |>
+# gtsummary::bold_p()
+
+# baseline_table |> save_table("baseline_table.docx")
+```
+
+```{r}
+c("huijts_simple_ext_svd") |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      svd_system_calc() |>
+      vertical_stacked_bars(score = .x, t.size = 6) +
+      ggplot2::theme(legend.position = "none") +
+      ggplot2::ggtitle(name) +
+      ggplot2::ggtitle("Small Vesel Disease burden score")
+  })
+
+c("huijts_simple_ext_svd") |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      svd_system_calc() |>
+      vertical_stacked_bars(score = .x, t.size = 2) +
+      ggplot2::theme( # legend.position = "none",
+        axis.title = ggplot2::element_text(),
+        text = ggplot2::element_text(size = 10)
+      ) +
+      # ggplot2::ggtitle("") +
+      # ggplot2::ggtitle("Smal Vesel Disease burden score") +
+      ggplot2::xlab("Physical acitivty level") +
+      ggplot2::ylab("Distribution")
+  }) |>
+  (\(.x){
+    ggplot2::ggsave("svd_x_pa_dist.png",
+      plot = .x[[1]], width = 140, height = 80, units = "mm", dpi = 600
+    )
+  })()
+```
+
+### Planned analyses
+
+```{r}
+#| tbl-cap: Minimaly adjusted models with age and sex.
+purrr::pluck(targets::tar_read(lst_multi_olr_orig), "complete_list")[[1]] |>
+  fix_labels() |>
+  gtsummary::as_gt() |>
+  # gt::tab_header(title = "Planned minimally adjusted analyses")|>
+  gt_theme()
+```
+
+### Independent correlations in multivariable analysis
+
+```{r}
+targets::tar_read(list_multi_var_olr) |>
+  gtsummary::as_gt() |>
+  # gt::tab_header(title = "Ordinal logistic regression analyses")|>
+  gt_theme()
+```
+
+### Complete simple interaction analyses
+
+```{r}
+targets::tar_read(list_multi_var_olr_interact) |>
+  purrr::map(fix_labels) |>
+  (\(.x){
+    gtsummary::tbl_stack(.x, glue::glue("{fix_labels_raw(names(.x))} minimal interaction analysis"))
+  })() |>
+  gtsummary::as_gt() |>
+  gt::tab_footnote(footnote = "All analyses adjusted for age and sex") |>
+  # gt::tab_header(title = "Ordinal logistic regression analyses")|>
+  gt_theme()
+```
+
+
+### Merged table of adjustments and interact
+
+```{r}
+targets::tar_read(lst_olr_interact_merged) |>
+  purrr::imap(\(.x, .i) {
+    purrr::map(.x, \(.y) {
+      gtsummary::tbl_regression(.y, exponentiate = TRUE) |>
+        compress_logical_vars()
+    }) |>
+      tbl_merge_named() |>
+      gtsummary::remove_row_type(
+        variables = -dplyr::one_of(.i),
+        type = "all"
+      )
+  }) |>
+  gtsummary::tbl_stack() |>
+  fix_labels()|>
+  gtsummary::as_gt() |>
+  gt::tab_footnote(footnote = "All analyses adjusted for age and sex") |>
+  # gt::tab_header(title = "Ordinal logistic regression analyses")|>
+  gt_theme()
+```

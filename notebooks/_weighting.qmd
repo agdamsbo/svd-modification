@@ -27,6 +27,7 @@ ds <- get_vars(targets::tar_read("df_complete"), vars.groups = "poster") |>
 Det har stor betydning, hvilken variabel, der udvælges til vægtning.
 
 ```{r}
+set.seed(112358)
 mod <- ds |>
   (\(.x){
     mgcv::gam(pase_0_high ~ s(age) + female_sex + alone + smoker + hyperten + diabetes + ais + afib,
@@ -37,6 +38,7 @@ mod <- ds |>
 
 mod |> plot(shade=TRUE,
   main = "Non-linear function of age in PASE propensity")
+
 
 ds <- ds |> dplyr::mutate(
   propensity_gam = predict(mod, type = "response"),
@@ -73,10 +75,7 @@ dclus2 <- svydesign(id = ~id, data = ds, weights = ~weight_gam)
 mod.olr <- svyolr(simple_score ~ pase_0_high + age + female_sex + alone + smoker + hyperten + diabetes + ais + afib,
   design = dclus2
 )
-```
 
-
-```{r}
 mod.olr|>
   gtsummary::tbl_regression(
     show_single_row = dplyr::where(is.logical),
@@ -85,3 +84,30 @@ mod.olr|>
   gtsummary::add_global_p() |> 
   fix_labels()
 ```
+
+```{r}
+svyolr(simple_score ~ pase_0_high,
+  design = dclus2
+) |>
+  gtsummary::tbl_regression(
+    show_single_row = dplyr::where(is.logical),
+    exponentiate = TRUE
+  ) |>
+  gtsummary::add_global_p() |> 
+  fix_labels()
+
+ds |>
+  (\(.x){
+    MASS::polr(simple_score ~ pase_0_high + age + female_sex + alone + smoker + hyperten + diabetes + ais + afib,
+      data = .x, Hess = TRUE,
+      method = "logistic"
+    )
+  })() |>
+  gtsummary::tbl_regression(
+    show_single_row = dplyr::where(is.logical),
+    exponentiate = TRUE
+  ) |>
+  gtsummary::add_global_p() |> 
+  fix_labels()
+```
+

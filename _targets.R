@@ -27,7 +27,7 @@ tar_option_set(
   # cluster, select a controller from the {crew.cluster} package.
   # For the cloud, see plugin packages like {crew.aws.batch}.
   # The following example is a controller for Sun Grid Engine (SGE).
-  # 
+  #
   #   controller = crew.cluster::crew_controller_sge(
   #     # Number of workers that the pipeline can scale up to:
   #     workers = 10,
@@ -52,20 +52,20 @@ tar_source()
 list(
   tar_target(
     name = ls_data,
-    command = full_dataset(key="SVD_REDCAP_API"),
-    cue = targets::tar_cue(mode="always"),
+    command = full_dataset(key = "SVD_REDCAP_API"),
+    # cue = targets::tar_cue(mode = "always"),
     description = "Main dataset acquisition"
     # format = "qs" # Efficient storage for general data objects.
   ),
   tar_target(
     name = flowchart_dot,
-    command = create_flowchart(ls_data,export.path = here::here("images/flow.dot")),
+    command = create_flowchart(ls_data, export.path = here::here("images/flow.dot")),
     description = "Flowchart dot file export for better plotting"
     # format = "qs" # Efficient storage for general data objects.
   ),
   tar_target(
     name = flowchart_clin,
-    command = clinical_flowchart(df_complete,export.path = here::here("images/flow_main.dot")),
+    command = clinical_flowchart(df_complete, export.path = here::here("images/flow_main.dot")),
     description = "Flowchart dot file export for better plotting"
     # format = "qs" # Efficient storage for general data objects.
   ),
@@ -81,7 +81,59 @@ list(
   ),
   tar_target(
     name = df_complete,
-    command = dplyr::left_join(clin_data,cut_scores(data = complete_scores, prefix = "")),
+    command = dplyr::left_join(clin_data, 
+                               cut_scores(data = complete_scores, prefix = "")) |>
+      dplyr::mutate(include = !is.na(pase_0) & !is.na(simple_score)),
     description = "Joined data set of SVD scores and clinical data"
-  )
+  ),
+  tar_target(
+    name = df_formatted,
+    command = formatted_df(df_complete),
+    description = "Formatted complete dataset"
+  ),
+  tar_target(
+    name = list_multi_var_olr,
+    command = mulitvar_olr(df_formatted),
+    description = "Merged uni and mulitvariable olr analyses"
+  ),
+  tar_target(
+    name = list_multi_var_olr_interact,
+    command = mulitvar_olr_interact(df_formatted),
+    description = "List of minimally adjust interaction analyses"
+  ),
+  tar_target(
+    name = lst_multi_olr,
+    command = planned_multi_olr(df_formatted),
+    description = "Combined list of planned OLR models and formatted tables"
+  ),
+  tar_target(
+    name = lst_multi_olr_orig,
+    command = planned_multi_olr(df_formatted,gen_exp = c("age", "female_sex")),
+    description = "Combined list of originally planned OLR models and formatted tables"
+  ),
+  tar_target(
+    name = lst_multi_olr_plot,
+    command = multi_coef_plot(lst_multi_olr),
+    description = "Plots planned OLR model coefs"
+  ),
+  tar_target(
+    name = rds_collinearity_test_orig,
+    command = write_collinearity_test_rds(data = lst_multi_olr_orig,file = here::here("check_orig.rds")),
+    description = "Save orig collinearity RDS"
+  ),
+  tar_target(
+    name = rds_collinearity_test_mod,
+    command = write_collinearity_test_rds(data = lst_multi_olr,file = here::here("check_reduced.rds")),
+    description = "Save modified collinearity RDS"
+  ),
+  tar_target(
+    name = lst_olr_interact_merged,
+    command = multi_string_olr(data = df_formatted, out = "simple_score_f", pase = "pase_0_q", gen_exp = c("age", "female_sex"), main_exp = purrr::pluck(model_input(), "main_exp")),
+    description = "Merged list of all (extended) planned anayses"
+  )#,
+  # tar_target(
+  #   name = gt_mini_multi_merge,
+  #   command = mini_multi_merge(lst_olr_interact_merged),
+  #   description = "Merged table of all (extended) planned anayses"
+  # )
 )

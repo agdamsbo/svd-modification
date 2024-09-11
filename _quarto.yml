@@ -1,15 +1,16 @@
 project:
-  type: manuscript
+  # type: manuscript
   output-dir: docs/
 
-manuscript:
-  article: index.qmd
+# manuscript:
+#   article: index.qmd
 
 format:
   html:
     comments:
       hypothesis: true
   docx: default
+    # reference-doc: custom-reference-doc.docx
   pdf: default
 
 execute:

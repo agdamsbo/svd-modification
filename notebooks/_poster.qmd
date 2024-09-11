@@ -1,0 +1,76 @@
+```{r}
+
+extrafont::loadfonts()
+extrafont::font_import()
+extrafont::fonttable()
+
+p <- c(
+  "simple_score_f",
+  "full_score_f",
+  "olama_amended_ext_svd",
+  "olama_simple_ext_svd"
+)[1] |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      svd_system_calc() |>
+      vertical_stacked_bars(score = .x, t.size = 8, l.color = "white", l.size = 1) +
+      ggplot2::theme(legend.position = "none") +
+      ggplot2::ggtitle(name)
+  })
+
+
+ggplot2::ggsave(here::here("simple_score_x_pase_dist_SF.pdf"),
+  plot = p[[1]] +
+    theme_poster() +
+    ggplot2::theme(
+      plot.title = ggplot2::element_blank(),
+      text = ggplot2::element_text(family = "Jost-Medium"),
+      panel.grid.major = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.border = ggplot2::element_blank(),
+      panel.background = ggplot2::element_rect(fill = "transparent"), # transparent panel bg
+      plot.background = ggplot2::element_rect(fill = "transparent", color = NA) # transparent plot bg
+    ),
+  width = 585, height = 115, units = "mm", dpi = 600
+)
+```
+
+```{r}
+# multi_coef_plot(targets::tar_read(lst_multi_olr_orig)) |>
+#   patchwork::wrap_plots(ncol = 1, guides = "auto", heights = c(2, 3)) +
+#   patchwork::plot_annotation(subtitle = "Adjusting for age and sex")
+
+p_coefs <- stack2long(targets::tar_read(lst_multi_olr_orig)) |> format_long()|>
+    dplyr::filter(groupname_col %in% c("Simplified score")) |> 
+    olr_forrest_plot(x.tics = create_log_tics(c(.2, .5, .8, 1))[-1],
+                             p.size=12,
+                             b.width=.3,
+                             l.width=4,
+                             d.with=.6) +
+      ggplot2::scale_color_manual(values = viridis::viridis(5)[c(1,3)]) +
+      ggplot2::scale_fill_manual(values = viridis::viridis(5)[c(1,3)])
+
+ggplot2::ggsave(here::here("coef_bivar_SF.pdf"),
+  plot = p_coefs +
+    theme_poster() +
+    ggplot2::theme(
+      plot.title = ggplot2::element_blank(),
+      # text = ggplot2::element_text(family = "Jost-Medium"),
+      # panel.grid.major = ggplot2::element_blank(),
+      # panel.grid.minor = ggplot2::element_blank(),
+      panel.border = ggplot2::element_blank()#,
+      # panel.background = ggplot2::element_rect(fill = "transparent"), # transparent panel bg
+      # plot.background = ggplot2::element_rect(fill = "transparent", color = NA) # transparent plot bg
+    ),
+  width = 180, height = 170, units = "mm", dpi = 600
+)
+```
+
+
+
+ExStroke total events pr 100 pt years
+```{r}
+(24+19)/((157+157)*2)*100
+```
+

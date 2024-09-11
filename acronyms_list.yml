@@ -1,0 +1,66 @@
+---
+acronyms:
+  ## This is the beginning of an complete list of acronyms for general use
+  keys:
+    - shortname: cSVD
+      longname: Cerebral Small Vessel Disease
+    - shortname: SVD
+      longname: Small Vessel Disease
+    - shortname: UBC
+      longname: University of British Colombia
+    - shortname: WSC
+      longname: World Stroke Conference
+    - shortname: ESOC
+      longname: European Stroke Organisations Conference
+    - shortname: TALOS
+      longname: Efficacy of Citalopram Treatment in Acute Ischemic Stroke
+    - shortname: PASE
+      longname: Physical Activity Scale for the Elderly
+    - shortname: NIHSS
+      longname: National Institute of Health Stroke Scale
+    - shortname: mRS
+      longname: modified Rankin Scale
+    - shortname: AUROC
+      longname: area under the receiver operating curve
+    - shortname: IQR
+      longname: inter quartile range
+    - shortname: PA
+      longname: Physical activity
+    - shortname: CI
+      longname: confidence interval
+    - shortname: MR
+      longname: magnetic resonance
+    - shortname: MRI
+      longname: magnetic resonance imaging
+    - shortname: RESIST
+      longname: Remote Ischemic Conditioning for Acute Stroke
+    - shortname: ENIGMA
+      longname: Exploring Vascular Contributions to Cognitive Impairment and Dementia
+    - shortname: TIA
+      longname: transitory ischaemic attack
+    - shortname: MI
+      longname: myocardial infarction
+    - shortname: SES
+      longname: socio-economic status
+    - shortname: BBL
+      longname: Brain Behavior Laboratory
+    - shortname: CVRF
+      longname: cerebrovascular risk factors
+    - shortname: DAG
+      longname: Directed acyclic graph
+    - shortname: OLR
+      longname: Ordinal logistic regression
+    - shortname: AIS
+      longname: acute ischemic stroke
+    - shortname: WMH
+      longname: white matter hyperintensity
+      
+    - shortname: MI
+      longname: myocardial infarction
+    - shortname: MI
+      longname: myocardial infarction
+    - shortname: MI
+      longname: myocardial infarction
+      
+      
+---

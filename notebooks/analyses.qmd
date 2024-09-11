@@ -1,0 +1,642 @@
+---
+title: "SVD analyses and data exploration"
+format: 
+  docx:
+    fig-dpi: 300
+  # html: default
+execute: 
+  echo: false
+  warning: false
+  messages: false
+---
+
+
+```{r setup}
+library(see)
+library(performance)
+library(patchwork)
+source(here::here("R/functions.R"))
+df_all <- targets::tar_read(df_complete)
+
+df <- df_all |> dplyr::filter(include)
+
+df_format <- targets::tar_read(df_formatted)
+```
+
+
+## Baseline data overview
+
+Baseline overview including all available variables stratified by trial.
+
+```{r}
+baseline_table <- df_format |>
+  get_vars(c("pre", "clin")) |>
+  # dplyr::mutate(female_sex = dplyr::if_else(female_sex, "Female", "Male")) |>
+  # dplyr::transmute(simple_score, age, female_sex= dplyr::if_else(female_sex, "Female", "Male"), nihss, tpa, evt, pase_0, alone) |>
+  labelling_data() |>
+  gtsummary::tbl_summary(
+    by = trial,
+    missing = "no"
+  ) |>
+  # gtsummary::add_p() |>
+  gtsummary::add_overall()
+
+baseline_table |>
+  gtsummary::add_p() |>
+  gtsummary::bold_p()
+
+# baseline_table |> save_table("baseline_table.docx")
+```
+
+## SVD data evaluation
+
+Below, I will go through evaluating the SVD scores and subscores
+
+### Distribution
+
+Below are printed and SVD sub-score summmary table.
+
+```{r}
+subscore_table <- df_format |>
+  dplyr::select(dplyr::ends_with("_f") & !dplyr::contains("score")) |>
+  gtsummary::tbl_summary() |>
+  fix_labels()
+
+subscore_table
+
+# subscore_table |>
+#   save_table(filename = "subscore_table.docx")
+```
+
+I think we could consider simplifying some of the scores, as we do not have any basis to claim the difference in steps is proportional or based on any evidence.
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+df_format |>
+  dplyr::select(dplyr::all_of(paste0(purrr::pluck(model_input(), "outcomes"), "_n"))) |>
+  purrr::imap(\(.x, .i){
+    name <- gsub("_n$", "", .i) |>
+      subset_named_labels(var_labels())
+    svd_dist(.x) +
+      ggplot2::xlab(name) +
+      ggplot2::ylab("N")
+  }) |>
+  patchwork::wrap_plots(ncol = 2, guides = "collect") +
+  patchwork::plot_annotation(title = "SVD (sub)scores distribution")
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+#| tbl-cap: Overview of different scoring systems. Note 'extended Huijts et al' is similar to our.
+df_format |> svd_systems_overview()
+```
+
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+#| fig-cap: Note 'extended Huijts et al' is similar to our simple score.
+df_format |>
+  svd_system_calc() |>
+  dplyr::select(dplyr::ends_with("_svd")) |>
+  purrr::imap(\(.x, .i){
+    name <- gsub("_n$", "", .i) |>
+      subset_named_labels(var_labels())
+    svd_dist(.x) +
+      ggplot2::xlab(name) +
+      ggplot2::ylab("N")
+  }) |>
+  patchwork::wrap_plots(ncol = 2, guides = "collect") +
+  patchwork::plot_annotation(title = "SVD (sub)scores distribution")
+```
+
+
+### PA raw correlation
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+c(
+  "simple_score_f",
+  "full_score_f",
+  "olama_amended_ext_svd",
+  "olama_simple_ext_svd"
+)[c(1, 2)] |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      svd_system_calc() |>
+      vertical_stacked_bars(score = .x) +
+      ggplot2::theme(legend.position = "none") +
+      ggplot2::ggtitle(name)
+  }) |>
+  patchwork::wrap_plots(ncol = 1)
+
+
+# ggplot2::ggsave("simple_score_x_pase_dist.png",
+#   plot = p, width = 140, height = 140, units = "mm", dpi = 600
+# )
+```
+
+
+## Main analyses predefined complete OLR analyses 
+
+..with and without adjustments for all considered variables.
+
+Stacked regression table of all analyses
+
+```{r}
+purrr::pluck(targets::tar_read(lst_multi_olr_orig), "regression_stack") |>
+  gtsummary::as_gt() |>
+  gt::tab_style(
+    style = gt::cell_text(weight = "bold"),
+    locations = gt::cells_row_groups(groups = gtsummary::everything())
+  ) # |>
+# gt::gtsave("olr_regression_stack.docx")
+```
+
+### Collinearity
+
+Checking assumptions for each minimal model shows a serious issue with multi collinearity. Other meassures are fine.
+
+```{r}
+# targets::tar_read(lst_multi_olr_orig)[[1]][[1]] |> purrr::map(\(.x){
+#   suppressMessages(
+#     performance::check_model(.x[[2]], check = "vif")
+#   )
+# })
+
+# targets::tar_read(lst_multi_olr)[[1]][[1]] |> purrr::map(\(.x){
+#   suppressMessages(
+#     performance::check_model(.x[[2]], check = "vif")
+#   )
+# })
+```
+
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+#| fig-cap: "Collinearity check plots"
+## This step is taken due to problems nitting with correct libs not being loaded
+readRDS(file = here::here("check_orig.rds")) |>
+  purrr::map(plot) |>
+  patchwork::wrap_plots(ncol = 3)
+readRDS(file = here::here("check_reduced.rds")) |>
+  purrr::map(plot) |>
+  patchwork::wrap_plots(ncol = 3)
+```
+
+
+
+This can be solved by feature/variable reduction and exclude age and sex as variables in the model, as these are independently correlated to PASE.
+
+```{r}
+# 1:2 |> purrr::map(function(.y) {
+#   n <- names(complete_list)[.y]
+#   complete_list[.y] |>
+#     (\(.x){
+#       .x |> gtsummary::tbl_merge(tab_spanner = names(.x))
+#     })() |>
+#     fix_labels() |>
+#     gtsummary::as_gt() |>
+#     (\(.x){
+#       .x |> gt::gtsave(glue::glue("olr_regression_{snakecase::to_snake_case(n)}.docx"))
+#     })()
+# })
+```
+
+Comparing these plot panels, smoking shows to be affected by age/sex adjustments.
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+targets::tar_read(lst_multi_olr_plot) |>
+  patchwork::wrap_plots(ncol = 1, guides = "auto", heights = c(2, 3)) +
+  patchwork::plot_annotation(subtitle = "No further adjustments")
+
+# multi_coef_plot(targets::tar_read(lst_multi_olr)) |>
+#   patchwork::wrap_plots(ncol = 1, guides = "auto", heights = c(2, 3)) +
+#   patchwork::plot_annotation(subtitle="Adjusting for age and sex")
+
+multi_coef_plot(targets::tar_read(lst_multi_olr_orig)) |>
+  patchwork::wrap_plots(ncol = 1, guides = "auto", heights = c(2, 3)) +
+  patchwork::plot_annotation(subtitle = "Adjusting for age and sex")
+
+# ggplot2::ggsave(
+#   filename = "olr_plot_subscores.png",
+#   plot = p2, width = 140, height = 200, units = "mm", dpi = 600
+# )
+```
+
+Apparently, this is due to a biased inclusion. Participants smoking are significantly younger, as the older smokers either stopped (prior) or died.
+
+```{r}
+df_format |>
+  dplyr::select(simple_score_f_n, female_sex, age, smoker, hyperten, diabetes) |>
+  gtsummary::tbl_summary(by = smoker) |>
+  gtsummary::add_p() |>
+  fix_labels()
+```
+
+## Data evaluation
+
+Ordinal logistic regression with PASE quartile as outcome indicates a strong correlation
+
+```{r}
+var_list <- list(
+  m1 = c(
+    "age",
+    "female_sex",
+    "hyperten",
+    "diabetes",
+    "smoker",
+    "ais_tci",
+    "pase_0_q",
+    "full_score_f"
+  ),
+  m2 = c(
+    # "age",
+    # "female_sex",
+    "hyperten",
+    "diabetes",
+    "smoker",
+    "ais_tci",
+    "pase_0_q",
+    "full_score_f"
+  )
+)
+
+m_list <- var_list |> purrr::map(\(.x){
+  df_format |>
+    dplyr::select(tidyselect::all_of(.x)) |>
+    multivariable_olr("full_score_f")
+})
+
+# ls <- sjPlot::plot_model(m_list[[1]])
+```
+
+Assumptions evaluation of a multivariable OLR model
+PASE stands out with high VIF indicating severe collinarity.
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+m_check <- m_list |>
+  purrr::map(performance::check_collinearity, residual_type = "normal") |>
+  purrr::map(plot)
+m_check |>
+  purrr::pluck(1)
+```
+
+This needs further investigation
+
+First step is a simple table overview
+
+```{r}
+df_format |>
+  dplyr::select(
+    tidyselect::all_of(
+      c(
+        "age",
+        "female_sex",
+        "hyperten",
+        "diabetes",
+        "smoker",
+        "ais_tci",
+        "pase_0_q",
+        "simple_score_f",
+        "full_score"
+      )
+    )
+  ) |>
+  gtsummary::tbl_summary(
+    by = pase_0_q,
+    missing = "no"
+  ) |>
+  gtsummary::add_p() |>
+  fix_labels()
+```
+
+Second step is univariable regression analyses with PASE as outcome
+
+```{r}
+#| fig-cap: Univariable regression analyses
+df_format |>
+  dplyr::select(tidyselect::all_of(c(
+    purrr::pluck(model_input(), "gen_exp"),
+    purrr::pluck(model_input(), "main_exp"),
+    "pase_0_q"
+  ))) |>
+  regression_all_olr("pase_0_q") |>
+  purrr::pluck("Univariable") |>
+  fix_labels()
+```
+
+Age correlates strongly to PASE.
+
+Third and last step is trying to take out age and sex.
+
+```{r}
+m_check |>
+  purrr::pluck(2)
+```
+
+Comparing models shows the first is the better performing. Bum bum...
+
+```{r}
+performance::compare_performance(m_list, rank = TRUE)
+```
+
+
+
+OLR with full SVD-score as outcome
+
+```{r}
+df_format |>
+  dplyr::select(
+    tidyselect::all_of(c(
+      purrr::pluck(model_input(), "main_exp"),
+      "pase_0_q",
+      "full_score_f"
+    )),
+    -female_sex,
+    -age
+  ) |>
+  regression_all_olr("full_score_f") |>
+  (\(.x){
+    .x |>
+      gtsummary::tbl_merge(tab_spanner = names(.x))
+  })() |>
+  fix_labels()
+```
+
+Old model for reference
+
+```{r}
+df_format |>
+  dplyr::select(tidyselect::all_of(c(
+    purrr::pluck(model_input(), "gen_exp"),
+    purrr::pluck(model_input(), "main_exp"), "pase_0_q", "full_score_f"
+  ))) |>
+  regression_all_olr("full_score_f") |>
+  (\(.x){
+    .x |>
+      gtsummary::tbl_merge(tab_spanner = names(.x))
+  })() |>
+  fix_labels()
+```
+
+Further investigations of the relation between PASE and age.
+
+```{r}
+ggplot2::ggplot(df_format, ggplot2::aes(age, pase_0)) +
+  ggplot2::geom_point() +
+  ggplot2::geom_smooth(method = "lm")
+```
+
+Test of polynomial fit shows 2. degree functions has best fit (lowest AIC)...
+
+```{r}
+poly_list <- purrr::map(1:6, \(.x){
+  glm(pase_0 ~ poly(age, .x), data = df_format)
+})
+
+poly_list |>
+  purrr::map(AIC) |>
+  purrr::reduce(c)
+```
+
+.. though both linear (1. degree) and 2. degree have significant p-value.
+
+```{r}
+sjPlot::tab_model(purrr::pluck(poly_list, 4))
+```
+
+Linear and 2. degree polynomial function visualised.
+
+```{r}
+list(
+  sjPlot::plot_model(glm(pase_0 ~ poly(age, 1), data = df_format), type = "eff", terms = "age [all]", show.data = TRUE) + ggplot2::ylim(0, 600),
+  sjPlot::plot_model(glm(pase_0 ~ poly(age, 2), data = df_format), type = "eff", terms = "age [all]", show.data = TRUE) + ggplot2::ylim(0, 600)
+) |>
+  patchwork::wrap_plots()
+# performance::check_model(purrr::pluck(poly_list, 2))
+```
+
+## Subscore steps
+
+- Idea: evaluate different steps for all sub-scores to evaluate best correlation to clinical predictors for relevant cuts
+
+- Same approach as the one employed to illustrate different scoring systems
+
+Different cuts are pre-defined. For each predictor and each sub-score cut, a logistic or ordinal logistic model is created. For each predictor, the model performances are compared to yield the cut, with the best model fit. For each subscore, the cut ranking highest in most predictors is the "Best fit subscores"-scoring system.
+
+Below an overview of the different scoring suggestions for microbleeds as an example:
+
+```{r}
+df_format |>
+  svd_systems_overview(list.system = microbleed_cuts(), subset = names(microbleed_cuts())) |>
+  (\(.x){
+    .x$`_data`[1:5, ]
+  })() |>
+  gt::gt()
+```
+
+Comparisons for all subscore analyses
+
+```{r}
+#| include: false
+svdscore_analysis_compare(
+  df_format,
+  list(
+    # systems=svd_scoring_systems(),
+    mic = microbleed_cuts(),
+    lac = lacunes_cuts(),
+    wmh = wmh_cuts(),
+    atr = atr_cuts()
+  )
+)
+```
+
+
+
+```{r}
+ls <- svdscore_analysis_compare(
+  df_format,
+  list(
+    systems = svd_scoring_systems()
+  )
+)
+
+best_desc_rank <- ls[[1]] |>
+  purrr::map(purrr::pluck, "Name") |>
+  purrr::map(\(.x){
+    match(names(svd_scoring_systems()), .x)
+  }) |>
+  dplyr::bind_cols() |>
+  rowSums() |>
+  rank() |>
+  (\(.x){
+    names(svd_scoring_systems())[order(.x)]
+  })()
+
+best_desc_rank
+```
+
+Highest ranked scoring systems in order of association to predictors.
+
+```{r}
+best_desc_rank |>
+  head(4) |>
+  (\(.x){
+    # browser()
+    df_format |>
+      svd_systems_overview(
+        list.system = svd_scoring_systems(),
+        subset = match(.x, names(svd_scoring_systems()))
+      )
+  })()
+```
+
+
+```{r}
+# df_format |>
+#   svd_systems_overview(list.system = svd_scoring_systems(), subset = names(svd_scoring_systems()))
+```
+
+```{r}
+best_desc_rank[c(1,4)] |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      svd_system_calc() |>
+      vertical_stacked_bars(score = .x) +
+      ggplot2::theme(legend.position = "none") +
+      ggplot2::ggtitle(name)
+  }) |>
+  patchwork::wrap_plots(ncol = 1)
+```
+
+```{r}
+#| include: false
+best_desc_rank[6] |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      svd_system_calc() |>
+      dplyr::select(dplyr::all_of(c(.x, "pase_0_q", "microbleed_f", "lacunes_f", "wmh_f", "atrophy_f"))) |>
+      (\(.y){
+        split(.y, .y[[.x]])
+      })() |>
+      purrr::map(\(.z){
+        .z |>
+          gtsummary::tbl_summary(
+            by = pase_0_q,
+            include = -{{ .x }},
+            missing = "no"
+          ) |>
+          fix_labels()
+      }) |>
+      (\(.m){
+        .m |>
+          gtsummary::tbl_stack(
+            group_header = glue::glue("{name} ({names(.m)})"),
+            quiet = TRUE
+          )
+      })()
+  })
+```
+
+
+
+Based on the previous extensive testing, the 
+
+## Conclusion
+
+- Due to collinearity, we should modify the analysis plan to take out age and sex from minimal analysis, as these are highly correlated to PASE score. Univariable/bivariable analysis should be included.
+
+- A table with univariable and multivariable analyses could be included, though this poses a risk for multicollinearity as well.
+
+- The issue around collinearity is a result on its own.
+
+- Smoking patterns needs to be addressed on its own, and should be excluded from analyses due to a severe inclusion bias.
+
+
+```{r}
+#| include: false
+### Sanity check
+
+# ..of considered variables in UV linear regressions
+
+
+# regression_all <- function(data, out) {
+#   list(
+#     "Univariable" = data |>
+#       gtsummary::tbl_uvregression(
+#         method = lm,
+#         y = !!dplyr::sym(out),
+#         show_single_row = dplyr::where(is.logical)
+#       ),
+#     "Multivariable" = lm(as.formula(glue::glue("{out}~.")), data = data) |>
+#       gtsummary::tbl_regression(
+#         show_single_row = dplyr::where(is.logical)
+#       )
+#   )
+# }
+#
+# df_format |>
+#   # dplyr::mutate(pase_0=stRoke::quantile_cut(pase_0,20,group.names = 1:20)) |>
+#   dplyr::select(tidyselect::all_of(c(
+#     purrr::pluck(model_input(), "gen_exp"),
+#     purrr::pluck(model_input(), "main_exp"), "pase_0_q", "full_score"
+#   ))) |>
+#   regression_all("full_score") |>
+#   (\(.x){
+#     .x |>
+#       gtsummary::tbl_merge(tab_spanner = names(.x))
+#   })() |>
+#   fix_labels()
+```
+
+
+
+
+```{r}
+#| include: false
+# Attemting to create an ordinal eleastic net model
+## Subsetting data
+# df_net <- df_format[c(
+#   "age",
+#   "female_sex",
+#   "hyperten",
+#   "diabetes",
+#   "smoker",
+#   "ais_tci",
+#   "pase_0",
+#   "simple_score_f"
+# )] |>
+#   dplyr::mutate(dplyr::across(dplyr::where(is.logical), \(.x) as.numeric(.x))) |>
+#   na.omit()
+#
+# ## Creating the model
+# ## a little unsure on family
+# set.seed(123)
+# m_net <- ordinalNet::ordinalNetTune(
+#   dplyr::select(df_net, -simple_score_f) |> as.matrix(),
+#   df_net[["simple_score_f"]] |> factor(),
+#   family = "cumulative",
+#   link = "logit",
+#   nFolds = 5,
+#   nLambda = 20,
+#   # lambdaVals = 10^seq(-4,5),
+#   printProgress = TRUE
+# )
+#
+# ## The plot shows, that, the model does not find a minimum
+# ##
+# plot(m_net)
+## Doesn't converge
+```

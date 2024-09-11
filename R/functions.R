@@ -18,10 +18,15 @@ full_dataset <- function(key) {
     token = keyring::key_get(key),
     fields = c(
       "record_id",
-      "trial_name"
+      "trial_name",
+      "trial_id"
     ), forms = c("svd_score", "consensus_score")
   )
 }
+
+
+# REDCapR::redcap_metadata_read(redcap_uri = "https://redcap.au.dk/api/",
+#   token = keyring::key_get("SVD_REDCAP_API"))$data
 
 #' Merge consensus assessments with raw scores and clean
 #'
@@ -34,7 +39,8 @@ full_dataset <- function(key) {
 #' data <- targets::tar_read("ls_data")
 #' data |>
 #'   final_score() |>
-#'   (\(.x) summary(factor(.x$consensus)))()
+#'   View()
+#' (\(.x) summary(factor(.x$consensus)))()
 final_score <- function(data) {
   main_score <- c(
     "microbleed",
@@ -346,6 +352,7 @@ talos_data_enrich <- function(data,
     dplyr::mutate(
       dob = as.Date(stRoke::cpr_dob(cpr), format = "%d-%m-%Y"),
       age = stRoke::age_calc(dob, as.Date(rdate)),
+      inc_date = rdate,
       female_sex = stRoke::cpr_female(cpr)
     ) |>
     dplyr::select(-cpr) |>
@@ -380,8 +387,10 @@ format_talos <- function(data) {
         ~ as.character(.x)
       ),
       smoker = dplyr::case_match(
-        reg_rygning, "1" ~ TRUE,
-        c("2", "3", "4") ~ FALSE,
+        reg_rygning,
+        c("1", "2") ~ "current",
+        c("3") ~ "prior",
+        c("4") ~ "never",
         "9" ~ NA
       ),
       # Living alone defined as not together with somebody
@@ -444,6 +453,7 @@ format_talos <- function(data) {
       tci = reg_tidl_tci,
       tpa = reg_trombolyse,
       evt = reg_trombektomi,
+      inc_date = as.Date(inc_date),
       any_perf,
       nihss = talos_nihss16_0,
       mrs_eos = substr(talos_mrs01_4, 1, 1)
@@ -553,6 +563,7 @@ resist_data_enrich <- function(data) {
     dplyr::mutate(
       dob = as.Date(stRoke::cpr_dob(cpr), format = "%d-%m-%Y"),
       age = stRoke::age_calc(dob, as.Date(rand_dato_tid)),
+      inc_date = rand_dato_tid,
       female_sex = stRoke::cpr_female(cpr)
     ) |>
     dplyr::select(-cpr) |>
@@ -586,21 +597,28 @@ format_resist <- function(data) {
         .cols = dplyr::everything(),
         ~ as.character(.x)
       ),
+      # smoker = dplyr::case_match(
+      #   smoking, c("1","2", "3") ~ TRUE,
+      #   c("4") ~ FALSE,
+      #   "9" ~ NA
+      # ),
       smoker = dplyr::case_match(
-        smoking, "1" ~ TRUE,
-        c("2", "3", "4") ~ FALSE,
-        "9" ~ NA
+        smoking,
+        c("1") ~ "current",
+        c("2") ~ "prior",
+        c("3") ~ "never",
+        "4" ~ NA
       ),
       # Living alone defined as not together with somebody
       alone = dplyr::case_match(
         civil_status, "1" ~ FALSE,
-        c("2", "3") ~ TRUE,
-        "9" ~ NA
+        c("2", "98") ~ TRUE,
+        "99" ~ NA
       ),
       alc_more = dplyr::case_match(
         alcohol, "1" ~ FALSE,
         "2" ~ TRUE,
-        "9" ~ NA
+        "99" ~ NA
       ),
       dplyr::across(
         .cols = c(
@@ -642,6 +660,7 @@ format_resist <- function(data) {
       ami = ami_dicho_prior,
       pad = pad_dicho,
       nihss,
+      inc_date = as.Date(inc_date),
       tpa,
       evt,
       any_perf,
@@ -651,6 +670,13 @@ format_resist <- function(data) {
   out
 }
 
+#' Collect all clinical data
+#'
+#' @return
+#' @export
+#'
+#' @examples
+#' ds <- clin_data_all()
 clin_data_all <- function() {
   data_svd <- svd_merging_old(keyring::key_get("SVD_REDCAP_API")) |>
     dplyr::mutate(dplyr::across(dplyr::everything(), ~ as.character(.x)))
@@ -680,7 +706,10 @@ clin_data_all <- function() {
     purrr::map(dplyr::left_join, dplyr::select(data_svd, dplyr::all_of(c("record_id", "trial_id")))) |>
     dplyr::bind_rows() |>
     dplyr::mutate(
-      pase_0_high = pase_0 > median(as.numeric(pase_0), na.rm = TRUE)
+      pase_0_high = pase_0 > median(as.numeric(pase_0), na.rm = TRUE),
+      year = format(inc_date, "%Y"),
+      month = format(inc_date, "%m"),
+      winter = as.numeric(month) %in% c(1, 2, 12)
     )
 }
 
@@ -805,7 +834,7 @@ define_variables <- function(set) {
       "simple_score",
       "age",
       "female_sex",
-      "pase_0_high",
+      "pase_0",
       "alone",
       "smoker",
       "hyperten",
@@ -813,8 +842,28 @@ define_variables <- function(set) {
       "ais",
       "afib"
     ),
+    out = c(
+      "simple_score"
+    ),
+    preds = c(
+      "age",
+      "female_sex",
+      "pase_0",
+      # "alone",
+      "smoker",
+      # "alc_more",
+      "hyperten",
+      "diabetes",
+      # "tci",
+      # "ais"#,
+      # "ami",
+      # "afib",
+      # "pad" # ,
+      # "year",
+      # "winter"
+      "ais_tci"
+    ),
     pre = c(
-      "simple_score",
       "age",
       "female_sex",
       "pase_0",
@@ -827,7 +876,9 @@ define_variables <- function(set) {
       "ais",
       "ami",
       "afib",
-      "pad"
+      "pad" # ,
+      # "year",
+      # "winter"
     ),
     clin = c(
       "active_treatment",
@@ -865,6 +916,18 @@ get_vars <- function(data, vars.groups) {
   data |> dplyr::select(tidyselect::all_of(get_var_vec(vars.groups)))
 }
 
+fix_labels_raw <- function(data, keep = FALSE) {
+  out <- data |>
+    subset_named_labels(var_labels()) |>
+    unname()
+
+  if (keep) {
+    ifelse(is.na(out), data, out)
+  } else {
+    out
+  }
+}
+
 #' Title
 #'
 #' @param data
@@ -877,12 +940,23 @@ get_vars <- function(data, vars.groups) {
 #' data |> fix_labels()
 fix_labels <- function(data) {
   cls <- class(data)
-  data[[1]][["variable"]][data[[1]][["row_type"]] == "label"] |>
-    subset_named_labels(var_labels()) |>
-    unname() -> data[[1]][["label"]][data[[1]][["row_type"]] == "label"]
+  old.labels <- data[[1]][["variable"]][data[[1]][["row_type"]] == "label"]
+  new.labels <- old.labels |>
+    purrr::map_chr(\(.x){
+      .x |>
+        strsplit(split = ":") |>
+        unlist() |>
+        fix_labels_raw() |>
+        paste(collapse = " * ")
+    }) # The above handles interaction term labels
+  data[[1]][["label"]][data[[1]][["row_type"]] == "label"] <- ifelse(is.na(new.labels),
+    old.labels,
+    new.labels
+  )
   class(data) <- cls
   data
 }
+
 
 ################################################################################
 ########
@@ -909,6 +983,46 @@ simple_score <- function(data) {
       atrophy = dplyr::if_else(svd_atrophy < 2, 0, 1),
       score = microbleed + lacunes + wmh + atrophy
     )
+}
+
+#' SImplifies full score based on supplied cut values
+#'
+#' @param data
+#' @param name.score
+#' @param lab.mic
+#' @param lab.lac
+#' @param lab.wmh
+#' @param lab.atr
+#' @param append
+#'
+#' @return
+#' @export
+#'
+#' @examples
+simplified_score <- function(data,
+                             name.score = "new.simple.score",
+                             lab.mic = c(0, 1, 1, 1, 1),
+                             lab.lac = c(0, 0, 0, 1, 1),
+                             lab.wmh = 0:3,
+                             lab.atr = 0:3,
+                             append = TRUE) {
+  out <- as.numeric(factor(data$microbleed_f, labels = lab.mic)) - 1 +
+    as.numeric(factor(data$lacunes_f, labels = lab.lac)) - 1 +
+    as.numeric(factor(data$wmh_f, labels = lab.wmh)) - 1 +
+    as.numeric(factor(data$atrophy_f, labels = lab.atr)) - 1
+
+  if (append) {
+    structure(
+      cbind(
+        data,
+        out
+      ),
+      class = class(data),
+      names = c(colnames(data), name.score)
+    )
+  } else {
+    out
+  }
 }
 
 
@@ -1003,7 +1117,10 @@ var_labels <- function() {
     female_sex = "Female sex",
     simple_score = "SVD score",
     bmi = "Body mass index",
-    smoker = "Current smoker",
+    smoker = "Smoking",
+    never = "Smoking (never)",
+    current = "Smoking (current)",
+    prior = "Smoking (prior)",
     alone = "Living alone",
     alc_more = "High alcohol consumption",
     hyperten = "Hypertension",
@@ -1020,6 +1137,7 @@ var_labels <- function() {
     rtreat_placebo = "Placebo trial treatment",
     pase_0 = "Pre-stroke PASE score",
     pase_0_high = "High pre-stroke PA",
+    pase_0_q = "Pre-stroke PA quartile",
     pase_4 = "6 months post-stroke PASE score",
     # pase_change,
     nihss = "Admission NIHSS",
@@ -1045,7 +1163,33 @@ var_labels <- function() {
     mrs_0_above0 = "Pre-stroke mRS > 0",
     mrs_eos = "mRS at End of Study",
     active_treatment = "Active treatment",
-    trial = "Clinical trial"
+    trial = "Clinical trial",
+    year = "Enrollment year",
+    month = "Month of enrollment",
+    winter = "Winther enrollment",
+    simple_score_f_n = "Simplified score",
+    simple_score_f = "Simplified score",
+    simple_score = "Simplified score",
+    microbleed_f = "Microbleeds subscore",
+    lacunes_f = "Lacunes subscore",
+    atrophy_f = "Atrophy subscore",
+    wmh_f = "WMH subscore",
+    full_score_f_n = "Complete score",
+    full_score_f = "Complete score",
+    full_score = "Complete score",
+    full_score_svd = "Complete score",
+    ais_tci = "Previous ischemic event",
+    olama_amended_ext_svd = "extended amended Olama et al 2020",
+    olama_amended_svd = "amended Olama et al 2020",
+    olama_simple_ext_svd = "extended simple Olama et al 2020",
+    olama_simple_svd = "simple Olama et al 2020",
+    huijts_simple_ext_svd = "modified Huijts et al 2013",
+    lab.mic = "Microbleeds subscore",
+    lab.lac = "Lacunes subscore",
+    lab.wmh = "WMH subscore",
+    lab.atr = "Atrophy subscore",
+    by_individual_best_fit = "Best fit subscores",
+    clinical_assumption = "Clinical assumptions"
   )
 }
 
@@ -1057,7 +1201,7 @@ var_labels <- function() {
 #' @return character vector
 #' @export
 #'
-subset_named_labels <- function(data, labels.raw) {
+subset_named_labels <- function(data, labels.raw = var_labels()) {
   labels.raw[match(data, names(labels.raw))]
 }
 
@@ -1108,7 +1252,7 @@ labelling_data <- function(data, label.list = var_labels()) {
 #' @export
 #'
 main_analysis <- function(include.pase = FALSE, data) {
-  if (!include.pase) data <- dplyr::select(data, -pase_0_high)
+  if (!include.pase) data <- dplyr::select(data, -dplyr::starts_with("pase_0"))
 
   data |>
     # (\(.x){
@@ -1265,8 +1409,8 @@ get_set_label <- function(set) {
 #'   })() |>
 #'   gtsummary::tbl_regression(
 #'     exponentiate = TRUE
-#'   ) |> 
-#'   #purrr::pluck("table_body") |>
+#'   ) |>
+#'   # purrr::pluck("table_body") |>
 #'   coef_forrest_plot(x.tics = create_log_tics(c(.2, 1)))
 coef_forrest_plot <- function(data,
                               cols = c(
@@ -1275,11 +1419,14 @@ coef_forrest_plot <- function(data,
                               ),
                               x.tics = create_log_tics(c(.2, .4, .6, .8, 1)),
                               legend.title = "") {
-  
-  if ("gtsummary" %in% class(data)){
-    data <- purrr::pluck(data,"table_body")
+  if ("tbl_merge" %in% class(data)) {
+    data <- pivot_gtsummary_long(data)
   }
-  
+
+  if ("gtsummary" %in% class(data)) {
+    data <- purrr::pluck(data, "table_body")
+  }
+
   assertthat::assert_that("tbl_df" %in% class(data))
 
   ds <- data |>
@@ -1307,16 +1454,16 @@ coef_forrest_plot <- function(data,
         }) |>
         dplyr::bind_rows() |>
         dplyr::mutate(
-          estimate = dplyr::if_else(reference_row, 1, estimate,missing=estimate),
+          estimate = dplyr::if_else(reference_row, 1, estimate, missing = estimate),
           label = factor(label, levels = rev(label))
         )
     }) |>
     dplyr::bind_rows()
 
-  
+
   if ("model" %in% names(data)) {
     p1 <- ds |>
-      dplyr::mutate(model=factor(model,levels=rev(unique(model)))) |> 
+      dplyr::mutate(model = factor(model, levels = rev(unique(model)))) |>
       # dplyr::filter(name=="decrease") |>
       ggplot2::ggplot(ggplot2::aes(
         x = log(estimate),
@@ -1379,16 +1526,70 @@ coef_forrest_plot <- function(data,
   }
 }
 
+olr_forrest_plot <- function(data,
+                             x.tics = create_log_tics(c(.2, .5, .8, 1)),
+                             legend.title = "",
+                             cols = NULL,
+                             p.size = 8,
+                             b.width = .2,
+                             l.width = 2,
+                             d.with = .5) {
+  out <- data |> ggplot2::ggplot(ggplot2::aes(
+    x = log(estimate),
+    y = label,
+    color = model,
+    fill = model
+  )) +
+    ggplot2::geom_vline(ggplot2::aes(xintercept = 0), linewidth = .5, linetype = "dashed") +
+    ggplot2::geom_errorbar(
+      ggplot2::aes(
+        x = log(estimate), xmin = log(conf.low),
+        xmax = log(conf.high)
+      ),
+      position = ggplot2::position_dodge(width = d.with),
+      width = b.width,
+      linewidth = l.width,
+      lineend = "round"
+    ) +
+    ggplot2::geom_point( # ggplot2::aes(shape = model),
+      size = p.size,
+      shape = 18,
+      position = ggplot2::position_dodge(width = d.with)
+    ) +
+    ggplot2::scale_x_continuous(
+      breaks = log(x.tics),
+      labels = x.tics,
+      limits = log(range(x.tics))
+    ) +
+    # ggplot2::scale_shape_manual(values = c(1, 1)) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+      panel.grid.minor = ggplot2::element_blank(),
+      # legend.title = ggplot2::element_text(""),
+      legend.position = "bottom"
+    ) +
+    ggplot2::ylab("") +
+    ggplot2::xlab("Odds ratio (log)") +
+    ggplot2::labs(
+      # shape = legend.title,
+      color = legend.title,
+      fill = legend.title
+    )
+
+  return(out)
+}
+
+
 #' Pivot merged gtsummary table for plotting coefficients
 #'
 #' @param data list of merged gtsummary tables
 #'
 #' @return tibble
-#' @export 
+#' @export
 #'
-pivot_gtsummary_long <- function(data){
+pivot_gtsummary_long <- function(data) {
   assertthat::assert_that("tbl_merge" %in% class(data))
-  
+
   data |>
     purrr::pluck("table_body") |>
     (\(.x){
@@ -1414,4 +1615,1225 @@ pivot_gtsummary_long <- function(data){
           )
         }) |>
         dplyr::bind_rows()
-    })()}
+    })()
+}
+
+#' Functional run for multiple OLR models
+#'
+#' @param data
+#' @param out
+#' @param gen_exp
+#' @param adjust
+#' @param main_exp
+#' @param include.adjust
+#'
+#' @return list
+#' @export
+
+multi_olr <- function(data, out, gen_exp, adjust, main_exp, include.adjust = FALSE) {
+  if (include.adjust) {
+    all.exp <- c(main_exp, adjust, gen_exp)
+  } else {
+    all.exp <- c(main_exp, gen_exp)
+  }
+
+  reg.formula <- glue::glue("{out}~{paste0(unique(all.exp), collapse = '+')}")
+
+  data |>
+    (\(.x){
+      MASS::polr(as.formula(reg.formula),
+        data = .x,
+        Hess = TRUE,
+        method = "logistic"
+      )
+    })()
+}
+
+multi_olr_glue <- function(data,
+                           out,
+                           gen_exp = NULL,
+                           pase,
+                           main_exp,
+                           formula.glue = "{out}~{main_exp}*{pase}{ifelse(!is.null(gen_exp),paste('+',paste0(unique(gen_exp), collapse = '+')),'')}") {
+  reg.formula <- glue::glue(formula.glue)
+
+  data |>
+    (\(.x){
+      MASS::polr(as.formula(reg.formula),
+        data = .x,
+        Hess = TRUE,
+        method = "logistic"
+      )
+    })()
+}
+
+#' Standard regression table function
+#'
+#' @param data model
+#'
+#' @return gtsummary list
+#' @export
+#'
+reg_table <- function(data) {
+  data |>
+    gtsummary::tbl_regression(
+      show_single_row = dplyr::where(is.logical),
+      exponentiate = TRUE
+    )
+}
+
+#' Adding interaction terms results in gtsummary not being able to only show single row for logicals.
+#' This fundtion handles the functionality in a crude but efficient way.
+#'
+#' @param data gtsummary table list
+#'
+#' @return
+#' @export
+#'
+# out <-
+#' @examples
+compress_logical_vars <- function(data) {
+  data[[1]] <- split(data[[1]], data[[1]][["variable"]]) |>
+    purrr::map(\(.d){
+      # browser(skipCalls = 2)
+      if (!is.na(unique(.d$var_class)) & unique(.d$var_class) == "logical") {
+        n <- match("n_obs", names(.d)) # Used si split
+        out <- dplyr::bind_cols(
+          dplyr::select(.d[1, ], 1:n - 1),
+          dplyr::select(.d[nrow(.d), ], n:ncol(.d))
+        )
+      } else {
+        out <- .d
+      }
+      out
+    }) |>
+    dplyr::bind_rows()
+
+  data
+}
+
+
+save_table <- function(data, filename) {
+  data |>
+    gtsummary::as_gt() |>
+    gt::gtsave(filename = filename)
+}
+
+
+#' Formatting main data set for analyses
+#'
+#' @param data
+#'
+format_df <- function(data) {
+  # browser()
+  data |>
+    dplyr::mutate(
+      ais_tci = ais | tci,
+      smoker = factor(smoker, levels = c(
+        "never",
+        "current",
+        "prior"
+      )),
+      microbleed_f = factor(microbleed, levels = c("0", "1", "2-4", "5-10", ">10")),
+      lacunes_f = factor(lacunes, levels = c("0", "1", "2", "3-5", ">5")),
+      dplyr::across(tidyselect::all_of(c("atrophy", "wmh")),
+        ~ as.factor(.x),
+        .names = "{.col}_f"
+      )
+    ) |>
+    dplyr::mutate(dplyr::across(c(microbleed_f, lacunes_f, atrophy_f, wmh_f),
+      ~ as.numeric(.x) - 1,
+      .names = "{.col}_n"
+    )) |>
+    dplyr::mutate(full_score = dplyr::pick(
+      microbleed_f_n,
+      lacunes_f_n,
+      atrophy_f_n,
+      wmh_f_n
+    ) |>
+      rowSums()) |>
+    dplyr::mutate(
+      dplyr::across(c(full_score, simple_score),
+        ~ as.factor(.x),
+        .names = "{.col}_f"
+      )
+    ) |>
+    dplyr::mutate(dplyr::across(c(simple_score_f, full_score_f),
+      ~ as.numeric(.x) - 1,
+      .names = "{.col}_n"
+    )) |>
+    dplyr::mutate(
+      pase_0_q = stRoke::quantile_cut(pase_0, groups = 4, group.names = paste0("Q", 1:4)),
+      pase_0_q = forcats::fct_rev(pase_0_q)
+    )
+}
+
+svd_scoring_systems <- function() {
+  list(
+    "olama_amended_ext_svd" =
+      list(
+        lab.mic = c(0, 1, 1, 1, 1),
+        lab.lac = c(0, 0, 1, 2, 3),
+        lab.wmh = 0:3,
+        lab.atr = 0:3
+      ),
+    "olama_amended_svd" = list(
+      lab.mic = c(0, 1, 1, 1, 1),
+      lab.lac = c(0, 0, 1, 2, 3),
+      lab.wmh = 0:3,
+      lab.atr = rep(0, 4)
+    ),
+    "olama_simple_ext_svd" = list(
+      lab.mic = c(0, 1, 1, 1, 1),
+      lab.lac = c(0, 0, 0, 1, 1),
+      lab.wmh = c(0, 0, 1, 1),
+      lab.atr = c(0, 0, 1, 1)
+    ),
+    "olama_simple_svd" = list(
+      lab.mic = c(0, 1, 1, 1, 1),
+      lab.lac = c(0, 0, 0, 1, 1),
+      lab.wmh = c(0, 0, 1, 1),
+      lab.atr = rep(0, 4)
+    ),
+    "huijts_simple_ext_svd" = list(
+      lab.mic = c(0, 1, 1, 1, 1),
+      lab.lac = c(0, 1, 1, 1, 1),
+      lab.wmh = c(0, 0, 1, 1),
+      lab.atr = c(0, 0, 1, 1)
+    ),
+    "full_score_svd" = list(
+      lab.mic = 0:4,
+      lab.lac = 0:4,
+      lab.wmh = 0:3,
+      lab.atr = 0:3
+    ),
+    "by_individual_best_fit" = list(
+      lab.mic = c(0, 0, 0, 0, 1),
+      lab.lac = c(0, 0, 0, 0, 1),
+      lab.wmh = c(0, 1, 1, 1),
+      lab.atr = c(0, 0, 1, 1)
+    ),
+    "clinical_assumption" = list(
+      lab.mic = c(0, 0, 1, 1, 2),
+      lab.lac = c(0, 1, 1, 1, 2),
+      lab.wmh = c(0, 0, 1, 1),
+      lab.atr = c(0, 0, 1, 1)
+    )
+  )
+}
+
+microbleed_cuts <- function() {
+  list(
+    "mic_0_some" =
+      list(
+        lab.mic = c(0, 1, 1, 1, 1),
+        lab.lac = rep(0, 5),
+        lab.wmh = rep(0, 4),
+        lab.atr = rep(0, 4)
+      ),
+    "mic_0_1_more_many" =
+      list(
+        lab.mic = c(0, 1, 2, 2, 3),
+        lab.lac = rep(0, 5),
+        lab.wmh = rep(0, 4),
+        lab.atr = rep(0, 4)
+      ),
+    "mic_0_1_more" =
+      list(
+        lab.mic = c(0, 1, 2, 2, 2),
+        lab.lac = rep(0, 5),
+        lab.wmh = rep(0, 4),
+        lab.atr = rep(0, 4)
+      ),
+    "mic_few_more" =
+      list(
+        lab.mic = c(0, 0, 1, 1, 1),
+        lab.lac = rep(0, 5),
+        lab.wmh = rep(0, 4),
+        lab.atr = rep(0, 4)
+      ),
+    "mic_some_lots" =
+      list(
+        lab.mic = c(0, 0, 0, 0, 1),
+        lab.lac = rep(0, 5),
+        lab.wmh = rep(0, 4),
+        lab.atr = rep(0, 4)
+      )
+  )
+}
+
+lacunes_cuts <- function() {
+  list(
+    "lac_0_some" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = c(0, 1, 1, 1, 1),
+        lab.wmh = rep(0, 4),
+        lab.atr = rep(0, 4)
+      ),
+    "lac_0_1_more_many" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = c(0, 1, 2, 2, 3),
+        lab.wmh = rep(0, 4),
+        lab.atr = rep(0, 4)
+      ),
+    "lac_0_1_more" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = c(0, 1, 2, 2, 2),
+        lab.wmh = rep(0, 4),
+        lab.atr = rep(0, 4)
+      ),
+    "lac_few_more" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = c(0, 0, 1, 1, 1),
+        lab.wmh = rep(0, 4),
+        lab.atr = rep(0, 4)
+      ),
+    "lac_some_lots" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = c(0, 0, 0, 0, 1),
+        lab.wmh = rep(0, 4),
+        lab.atr = rep(0, 4)
+      )
+  )
+}
+
+wmh_cuts <- function() {
+  list(
+    "wmh_0_some" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = rep(0, 5),
+        lab.wmh = c(0, 1, 1, 1),
+        lab.atr = rep(0, 4)
+      ),
+    "wmh_little_some" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = rep(0, 5),
+        lab.wmh = c(0, 0, 1, 1),
+        lab.atr = rep(0, 4)
+      ),
+    "wmh_all" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = rep(0, 5),
+        lab.wmh = c(0, 1, 2, 3),
+        lab.atr = rep(0, 4)
+      ),
+    "wmh_some_much" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = rep(0, 5),
+        lab.wmh = c(0, 1, 1, 2),
+        lab.atr = rep(0, 4)
+      )
+  )
+}
+
+atr_cuts <- function() {
+  list(
+    "atr_0_some" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = rep(0, 5),
+        lab.wmh = rep(0, 4),
+        lab.atr = c(0, 1, 1, 1)
+      ),
+    "atr_little_some" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = rep(0, 5),
+        lab.wmh = rep(0, 4),
+        lab.atr = c(0, 0, 1, 1)
+      ),
+    "atr_all" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = rep(0, 5),
+        lab.wmh = rep(0, 4),
+        lab.atr = c(0, 1, 2, 3)
+      ),
+    "atr_some_much" =
+      list(
+        lab.mic = rep(0, 5),
+        lab.lac = rep(0, 5),
+        lab.wmh = rep(0, 4),
+        lab.atr = c(0, 1, 1, 2)
+      )
+  )
+}
+
+svdscore_analysis_compare <- function(data, list) {
+  list |> purrr::imap(\(.z, .i){
+    df_subs <- data |> svd_system_calc(list.system = .z)
+    preds <- c("pase_0", purrr::pluck(model_input(), "main_exp"))
+    # browser()
+    purrr::map(preds, \(.y){
+      vars <- names(df_subs) |>
+        tail(length(.z))
+
+      vars |>
+        purrr::map(\(.x){
+          .df <- df_subs
+          .df[.x] <- factor(.df[[.x]])
+          reg.formula <- paste0(.x, "~", paste0(c(.y), collapse = "+"))
+
+          if (length(levels(.df[[.x]])) == 2) {
+            out <- glm(as.formula(reg.formula),
+              family = "binomial",
+              data = .df
+            )
+          } else {
+            out <- MASS::polr(as.formula(reg.formula),
+              data = .df,
+              Hess = TRUE,
+              method = "logistic"
+            )
+          }
+          out
+        }) |>
+        setNames(vars)
+    }) |>
+      setNames(preds) |>
+      purrr::map(performance::compare_performance, rank = TRUE)
+  })
+}
+
+svd_system_table <- function(data,
+                             system = "new_score",
+                             lab.mic = c(0, 1, 1, 1, 1),
+                             lab.lac = c(0, 0, 0, 1, 1),
+                             lab.wmh = 0:3,
+                             lab.atr = 0:3) {
+  list(
+    microbleed_f = tibble::tibble(levels(data$microbleed_f), lab.mic),
+    lacunes_f = tibble::tibble(levels(data$lacunes_f), lab.lac),
+    wmh_f = tibble::tibble(levels(data$wmh_f), lab.wmh),
+    atrophy_f = tibble::tibble(levels(data$atrophy_f), lab.atr)
+  ) |>
+    purrr::map(setNames, c("Annotation", system)) |>
+    dplyr::bind_rows()
+}
+
+# |>
+#   gt::gt()
+# |>
+#   purrr::map(gt::gt) |>
+#   purrr::imap(\(.x,.i){
+#     # browser()
+#     .x |> gt::tab_row_group(
+#       label = fix_labels_raw(.i),
+#       rows = seq_len(nrow(.x$`_data`))
+#     )|>
+#       purrr::pluck(1)
+#   })
+
+
+
+svd_systems_overview <- function(data, list.system = svd_scoring_systems(), subset = seq_along(svd_scoring_systems())) {
+  # browser()
+  out <- purrr::imap(list.system[subset], \(.x, .i){
+    params <- list(.x, "data" = data, "system" = .i) |>
+      purrr::list_flatten()
+    do.call(svd_system_table, params)
+  }) |>
+    purrr::reduce(function(d1, d2) {
+      dplyr::bind_cols(d1, d2[, !names(d2) %in% names(d1)])
+    })
+
+  names(out) <- fix_labels_raw(names(out), keep = TRUE)
+
+  list <- list.system |>
+    purrr::pluck(1) |>
+    setNames(nm = NULL)
+  list_seqs <- list |> purrr::imap(\(.x, .i){
+    seq_along(.x) + sum(lengths(list[seq_len(.i - 1)]))
+  })
+
+  out <- out |>
+    gt::gt()
+
+  for (i in rev(seq_len(length(list.system |> purrr::pluck(1))))) {
+    out <- out |>
+      gt::tab_row_group(
+        label = fix_labels_raw(names(purrr::pluck(list.system, 1))[i]),
+        rows = list_seqs[[i]]
+      )
+  }
+
+  out
+}
+
+#' Appends SVD scoring systems with predefined arguments from list of lists
+#'
+#' @param data data containing relevant variables
+#'
+#' @return
+#' @export
+#'
+#' @examples
+svd_system_calc <- function(data, list.system = svd_scoring_systems()) {
+  message(paste("Added scores:", paste(names(list.system), collapse = ", ")))
+
+  dplyr::bind_cols(
+    data,
+    purrr::map(list.system, \(.x){
+      params <- list(.x, "data" = data, "append" = FALSE) |>
+        purrr::list_flatten()
+      do.call(simplified_score, params)
+    }) |> dplyr::bind_cols()
+  )
+}
+
+#' Vertical stacked bar plot wrapper
+#'
+#' @param data
+#' @param score
+#' @param group
+#' @param strata
+#' @param t.size
+#'
+#' @return
+#' @export
+#'
+#' @examples
+vertical_stacked_bars <- function(data,
+                                  score = "full_score",
+                                  group = "pase_0_q",
+                                  strata = NULL,
+                                  t.size = 2,
+                                  l.color = "black",
+                                  l.size = .5) {
+  df.table <- data |>
+    dplyr::select(
+      {{ score }},
+      {{ group }},
+      {{ strata }}
+    ) |>
+    table()
+
+  p <- df.table |>
+    rankinPlot::grottaBar(
+      scoreName = score,
+      groupName = group,
+      textColor = c("black", "white"),
+      strataName = strata,
+      textCut = 6,
+      textSize = 13,
+      printNumbers = "none",
+      lineColor = l.color,
+      lineSize = l.size,
+      drawLines = FALSE,
+      returnData = TRUE
+    )
+
+  colors <- viridisLite::viridis(nrow(df.table))
+  contrast_cut <-
+    sum(project.aid::contrast_text(colors, threshold = .3) == "white")
+
+  p |>
+    (\(.x){
+      .x$plot +
+        ggplot2::geom_text(
+          data = .x$rectData[which(.x$rectData$n >
+            0), ],
+          size = t.size,
+          fontface = "plain",
+          ggplot2::aes(
+            x = group,
+            y = p_prev + 0.49 * p,
+            color = as.numeric(score) > contrast_cut,
+            # label = paste0(sprintf("%2.0f", 100 * p),"%"),
+            label = paste0(sprintf("%2.0f", 100 * p), "%")
+          )
+        ) +
+        ggplot2::labs(fill = "SVD burden score") +
+        ggplot2::ylab("Physical activity level") +
+        ggplot2::scale_fill_manual(values = rev(colors))
+      # viridis::scale_fill_viridis(discrete = TRUE, direction = -1, option = "D")
+    })()
+}
+
+multivariable_olr <- function(data, out) {
+  MASS::polr(as.formula(glue::glue("{out}~.")),
+    data = data, Hess = TRUE,
+    method = "logistic"
+  )
+}
+
+regression_all_olr <- function(data, out) {
+  list(
+    "Univariable" = data |>
+      gtsummary::tbl_uvregression(
+        method = MASS::polr,
+        method.args = list(
+          Hess = TRUE,
+          method = "logistic"
+        ),
+        y = !!dplyr::sym(out),
+        show_single_row = dplyr::where(is.logical),
+        exponentiate = TRUE # ,
+        # pvalue_fun = ~ style_pvalue(.x, digits = 2)
+      ),
+    "Multivariable" = multivariable_olr(
+      data = data,
+      out = out
+    ) |>
+      gtsummary::tbl_regression(
+        show_single_row = dplyr::where(is.logical), exponentiate = TRUE
+      )
+  )
+}
+
+svd_dist <- function(data) {
+  dplyr::as_tibble(x = data) |>
+    ggplot2::ggplot(ggplot2::aes(x = value)) +
+    ggplot2::geom_histogram()
+}
+
+
+model_input <- function() {
+  list(
+    # gen_exp <- c("age", "female_sex"),
+    # gen_exp <- c("age"),
+    gen_exp = NULL, # Considered outcome variables/subscores
+    outcomes = c("simple_score_f", "full_score_f", "microbleed_f", "lacunes_f", "wmh_f", "atrophy_f"),
+    # Considered main exposures
+    main_exp = c("age", "female_sex", "alone", "alc_more", "smoker", "hyperten", "diabetes", "ais_tci", "afib", "ami"),
+    # Adjustment variable name
+    adjust = "pase_0_q"
+  )
+}
+
+
+
+#' Title
+#'
+#' @param data
+#' @param outcomes
+#' @param main_exp
+#' @param gen_exp
+#' @param adjust
+#'
+#' @return
+#' @export
+#'
+#' @examples
+#' planned_multi_olr
+#'
+planned_multi_olr <- function(data,
+                              outcomes = purrr::pluck(model_input(), "outcomes"),
+                              main_exp = purrr::pluck(model_input(), "main_exp"),
+                              gen_exp = purrr::pluck(model_input(), "gen_exp"),
+                              adjust = purrr::pluck(model_input(), "adjust")) {
+  complete_model_list <- outcomes |>
+    # purrr::set_names() |>
+    purrr::map(\(.o){
+      main_exp |>
+        # purrr::set_names() |>
+        purrr::map(\(.z){
+          c("No PA adjustment" = FALSE, "With PA adjustment" = TRUE) |>
+            (\(.y){
+              .y |>
+                # purrr::set_names() |>
+                purrr::map(\(.x){
+                  multi_olr(data,
+                    out = .o,
+                    gen_exp = gen_exp,
+                    adjust = adjust,
+                    main_exp = .z,
+                    include.adjust = .x
+                  )
+                })
+            })()
+        })
+    })
+
+  complete_list <- complete_model_list |>
+    purrr::map(\(.x){
+      purrr::map(.x, \(.y){
+        .y |>
+          purrr::map(reg_table) |>
+          gtsummary::tbl_merge(tab_spanner = names(.y)) |>
+          gtsummary::remove_row_type(
+            variables = tidyselect::any_of(c(adjust, gen_exp)),
+            type = "all"
+          )
+      }) |> gtsummary::tbl_stack()
+    }) |>
+    setNames(fix_labels_raw(outcomes))
+
+  regression_stack <- complete_list |>
+    (\(.x){
+      .x |> gtsummary::tbl_stack(group_header = names(.x))
+    })() |>
+    fix_labels()
+
+  list(
+    "complete_model_list" = complete_model_list,
+    "complete_list" = complete_list,
+    "regression_stack" = regression_stack
+  )
+}
+
+formatted_df <- function(data) {
+  data |>
+    dplyr::filter(include) |>
+    format_df()
+}
+
+stack2long <- function(data) {
+  purrr::pluck(data, "regression_stack") |>
+    purrr::pluck("table_body") |>
+    (\(.x){
+      purrr::map(c(1, 2), \(.y){
+        # browser(skipCalls = 1)
+        .x[c(1:7, grep(pattern = paste0("_", .y, "$"), names(.x)))] |>
+          dplyr::mutate(model = .y)
+      })
+    })() |>
+    purrr::map(\(.y){
+      names(.y) <- gsub("_[12]$", "", names(.y))
+      .y
+    }) |>
+    dplyr::bind_rows()
+}
+
+format_long <- function(data,
+                        model.labels = c(
+                          "No PA adjustment",
+                          "With PA adjustment"
+                        )) {
+  data |>
+    dplyr::mutate(
+      groupname_col = factor(groupname_col,
+        levels = unique(groupname_col)
+      ),
+      model = factor(model,
+        labels = model.labels
+      ),
+      label = factor(label,
+        levels = unique(label)
+      ),
+      ## Fixing label labels by using previous function to name levels
+      label = factor(label,
+        labels = na.omit(unique(ifelse(duplicated(fix_labels_raw(var_label)),
+          fix_labels_raw(label),
+          fix_labels_raw(var_label)
+        )))
+      )
+    ) |>
+    ## Filters out reference and header rows
+    dplyr::filter(
+      reference_row == FALSE &
+        header_row == FALSE | is.na(header_row)
+    )
+}
+
+multi_coef_plot <- function(data,
+                            model.labels = c(
+                              "No PA adjustment",
+                              "With PA adjustment"
+                            )) {
+  # browser()
+  complete_long <- data |> stack2long()
+
+  complete_long_format <- complete_long |> format_long(model.labels)
+
+  p1 <- complete_long_format |>
+    dplyr::filter(groupname_col %in% c("Simplified score", "Complete score")) |>
+    olr_forrest_plot() +
+    ggplot2::facet_wrap(ggplot2::vars(groupname_col)) +
+    ggplot2::xlab("Odds ratio of higher SVD score (log)") +
+    ggplot2::ylab("Possible effect modifier")
+
+
+
+  # ggplot2::ggsave(
+  #   filename = "olr_plot_simple_score.png",
+  #   plot = p1, width = 140, height = 140, units = "mm", dpi = 600
+  # )
+
+  p2 <- complete_long_format |>
+    dplyr::filter(!groupname_col %in% c("Simplified score", "Complete score")) |>
+    olr_forrest_plot() +
+    ggplot2::facet_wrap(ggplot2::vars(groupname_col)) +
+    ggplot2::xlab("Odds ratio of higher SVD sub-score (log)") +
+    ggplot2::ylab("Possible effect modifier")
+
+  list(p1, p2)
+}
+
+write_collinearity_test_rds <- function(data, file) {
+  # check_orig <- targets::tar_read(lst_multi_olr_orig)[[1]][[1]] |> purrr::map(\(.x){
+  #   performance::check_collinearity(.x[[2]], check = "vif")
+  # })
+
+  check_orig <- data[[1]][[1]] |> purrr::map(\(.x){
+    performance::check_collinearity(.x[[2]], check = "vif")
+  })
+  # here::here("check_orig.rds")
+  saveRDS(check_orig, file = file)
+
+
+  # check_reduced <- targets::tar_read(lst_multi_olr)[[1]][[1]] |> purrr::map(\(.x){
+  #   performance::check_collinearity(.x[[2]], check = "vif")
+  # })
+
+  # check_reduced <- ds2[[1]][[1]] |> purrr::map(\(.x){
+  #   performance::check_collinearity(.x[[2]], check = "vif")
+  # })
+  #
+  # saveRDS(check_reduced,file = here::here("check_reduced.rds"))
+
+  # check_orig |>
+  #   purrr::map(plot) |>
+  #   patchwork::wrap_plots(ncol = 3)
+  # check_reduced |>
+  #   purrr::map(plot) |>
+  #   patchwork::wrap_plots(ncol = 3)
+}
+
+tbl_merge_named <- function(data) {
+  gtsummary::tbl_merge(tbls = data, tab_spanner = names(data))
+}
+
+gt_theme <- function(data, ...) {
+  data |>
+    gt::tab_options(
+      row.striping.background_color = "#fafafa",
+      table_body.hlines.color = "#f6f7f7",
+      source_notes.font.size = 12,
+      table.font.size = 12,
+      table.width = gt::px(700),
+      heading.align = "left",
+      heading.title.font.size = 24,
+      table.border.top.color = "transparent",
+      table.border.top.width = gt::px(3),
+      data_row.padding = gt::px(7),
+      # row_group.font.size = 16,
+      # row_group.background.color = "grey"
+      ...
+    ) |>
+    gt::opt_row_striping() |>
+    gt::opt_all_caps() |>
+    gt::opt_table_font(
+      font = list(
+        gt::google_font("opensans"),
+        gt::default_fonts()
+      )
+    )
+}
+
+
+planned_multi_olr <- function(data,
+                              outcomes = purrr::pluck(model_input(), "outcomes"),
+                              main_exp = purrr::pluck(model_input(), "main_exp"),
+                              gen_exp = purrr::pluck(model_input(), "gen_exp"),
+                              adjust = purrr::pluck(model_input(), "adjust")) {
+  complete_model_list <- outcomes |>
+    purrr::map(\(.o){
+      main_exp |>
+        purrr::map(\(.z){
+          c("No PA adjustment" = FALSE, "With PA adjustment" = TRUE) |>
+            (\(.y){
+              .y |>
+                purrr::map(\(.x){
+                  multi_olr(data,
+                    out = .o,
+                    gen_exp = gen_exp,
+                    adjust = adjust,
+                    main_exp = .z,
+                    include.adjust = .x
+                  )
+                })
+            })()
+        })
+    })
+
+  complete_list <- complete_model_list |>
+    purrr::map(\(.x){
+      purrr::map(.x, \(.y){
+        .y |>
+          purrr::map(reg_table) |>
+          gtsummary::tbl_merge(tab_spanner = names(.y)) |>
+          gtsummary::remove_row_type(
+            variables = tidyselect::any_of(c(adjust, gen_exp)),
+            type = "all"
+          )
+      }) |> gtsummary::tbl_stack()
+    }) |>
+    setNames(fix_labels_raw(outcomes))
+
+  regression_stack <- complete_list |>
+    (\(.x){
+      .x |> gtsummary::tbl_stack(group_header = names(.x))
+    })() |>
+    fix_labels()
+
+  list(
+    "complete_model_list" = complete_model_list,
+    "complete_list" = complete_list,
+    "regression_stack" = regression_stack
+  )
+}
+
+
+mulitvar_olr <- function(data) {
+  data |>
+    svd_system_calc() |>
+    dplyr::select(tidyselect::all_of(c(
+      purrr::pluck(model_input(), "gen_exp"),
+      purrr::pluck(model_input(), "main_exp"),
+      "pase_0_q",
+      "huijts_simple_ext_svd"
+    ))) |>
+    dplyr::mutate(
+      huijts_simple_ext_svd = factor(huijts_simple_ext_svd) # ,
+      # pase_0_q = forcats::fct_rev(pase_0_q)
+    ) |>
+    regression_all_olr(out = "huijts_simple_ext_svd") |>
+    # purrr::pluck("Univariable") |>
+    purrr::map(fix_labels) |>
+    tbl_merge_named()
+}
+
+
+
+mulitvar_olr_interact <- function(data) {
+  data |>
+    svd_system_calc() |>
+    dplyr::mutate(
+      huijts_simple_ext_svd = factor(huijts_simple_ext_svd) # ,
+      # pase_0_q = forcats::fct_rev(pase_0_q)
+    ) |>
+    (\(.x){
+      vars <- purrr::pluck(model_input(), "main_exp")
+      vars |>
+        purrr::map(\(.y){
+          multi_olr_glue(
+            data = .x,
+            out = "huijts_simple_ext_svd",
+            pase = "pase_0_q",
+            gen_exp = c("age", "female_sex"),
+            main_exp = .y
+          ) |>
+            # reg_table() |>
+            gtsummary::tbl_regression(exponentiate = TRUE)
+        }) |>
+        setNames(vars)
+    })()
+}
+
+#' Multi list model merger
+#'
+#' @param data1
+#' @param data2
+#'
+#' @return
+#' @export
+#'
+#' @examples
+#' multi_var_interaction_merge(data1 = targets::tar_read(lst_multi_olr_orig), data2 = targets::tar_read(list_multi_var_olr_interact))
+multi_var_interaction_merge <- function(data1, data2) {
+  # browser()
+  require(gtsummary)
+  d1_format <- data1[[1]] |>
+    purrr::pluck(match("simple_score_f", purrr::pluck(model_input(), "outcomes"))) #|>
+
+  d1_format |>
+    purrr::imap(\(.y, .i){
+      .y |>
+        purrr::map(reg_table)
+    })
+
+  list_merge <- d1_format |>
+    purrr::imap(\(.x, .i){
+      list(.x,
+        "With PA interaction" = data2[[.i]] |>
+          compress_logical_vars()
+      ) |>
+        purrr::list_flatten()
+    }) |>
+    setNames(purrr::pluck(model_input(), "main_exp"))
+
+  gt_merge <- list_merge |>
+    purrr::imap(\(.x, .i){
+      .x |>
+        tbl_merge_named() |>
+        gtsummary::remove_row_type(
+          variables = -dplyr::one_of(.i),
+          type = "all"
+        )
+    })
+
+  gt_merge |>
+    gtsummary::tbl_stack() |>
+    fix_labels()
+}
+
+
+# |>
+#   gtsummary::tbl_regression(
+#     show_single_row = dplyr::where(is.logical),
+#     exponentiate = TRUE
+#   )
+
+#' Title
+#'
+#' @param data
+#' @param out
+#' @param gen_exp
+#' @param pase
+#' @param main_exp
+#' @param formula.strings
+#'
+#' @return
+#' @export
+#'
+#' @examples
+#' multi_string_olr(data = df_format, out = "simple_score_f", pase = "pase_0_q", gen_exp = c("age", "female_sex"), main_exp = purrr::pluck(model_input(), "main_exp"))
+multi_string_olr <- function(data,
+                             out,
+                             gen_exp = NULL,
+                             pase,
+                             main_exp,
+                             formula.strings = c(
+                               "No PA adjustment" = "{out}~{.exp}",
+                               "With PA adjustment" = "{out}~{.exp}+{pase}",
+                               "With PA interaction" = "{out}~{.exp}*{pase}"
+                             )) {
+  gen_adj <- ifelse(!is.null(gen_exp), paste0("+", paste(unique(gen_exp), collapse = "+")), "")
+  main_exp <- main_exp[!main_exp %in% gen_exp]
+
+  main_exp |>
+    purrr::set_names() |>
+    purrr::map(\(.exp){
+      formula.strings |>
+        purrr::map(\(.s){
+          polr_map(data,
+            formula = formula(glue::glue(.s, "{gen_adj}")),
+            Hess = TRUE,
+            method = "logistic"
+          )
+        }) |>
+        setNames(names(formula.strings))
+    })
+}
+
+
+#' Convenience function to insert correct formula in model output for mapping
+#'
+#' @param data data
+#' @param formula formula
+#' @param ... passed on to MASS::polr
+#'
+#' @return
+#' @export
+#'
+#' @examples
+polr_map <- function(data,
+                     formula,
+                     ...) {
+  m <- MASS::polr(
+    formula = formula,
+    data = data,
+    ...
+  )
+  m$call$formula <- formula
+
+  m
+}
+
+
+mini_multi_merge <- function(data) {
+  data |>
+    purrr::imap(\(.x, .i) {
+      purrr::map(.x, \(.y) {
+        gtsummary::tbl_regression(.y, exponentiate = TRUE) |>
+          compress_logical_vars()
+      }) |>
+        tbl_merge_named() |>
+        gtsummary::remove_row_type(
+          variables = -dplyr::one_of(.i),
+          type = "all"
+        )
+    }) |>
+    gtsummary::tbl_stack() |>
+    fix_labels()
+}
+
+
+######
+###### DAGs
+######
+
+dags_list <- function() {
+  list(
+    mediator = ggdag::dagify(
+      SVD ~ PA + CVRF,
+      PA ~ AGE_SEX + CVRF,
+      CVRF ~ AGE_SEX,
+      outcome = "SVD",
+      exposure = c("CVRF", "PA"),
+      coords = dag_coords()
+    ),
+    confounder = ggdag::dagify(
+      SVD ~ PA + CVRF,
+      PA ~ AGE_SEX,
+      CVRF ~ AGE_SEX + PA,
+      outcome = "SVD",
+      exposure = c("CVRF", "PA"),
+      coords = dag_coords()
+    ),
+    interaction = ggdag::dagify(
+      SVD ~ PA + CVRF + PA_CVRF,
+      PA ~ AGE_SEX,
+      CVRF ~ AGE_SEX,
+      PA_CVRF ~ PA + CVRF,
+      outcome = "SVD",
+      exposure = c("CVRF", "PA"),
+      coords = dag_coords()
+    ),
+    modification = ggdag::dagify(
+      SVD ~ CVRF + PA_CVRF,
+      PA ~ AGE_SEX,
+      CVRF ~ AGE_SEX,
+      PA_CVRF ~ PA + CVRF,
+      outcome = "SVD",
+      exposure = c("CVRF", "PA", "PA_CVRF"),
+      coords = dag_coords()
+    ),
+    independent = ggdag::dagify(
+      SVD ~ PA + CVRF,
+      PA ~ AGE_SEX,
+      CVRF ~ AGE_SEX,
+      outcome = "SVD",
+      exposure = c("CVRF", "PA"),
+      coords = dag_coords()
+    ),
+    intermediate_pa = ggdag::dagify(
+      SVD ~ CVRF,
+      PA ~ AGE_SEX,
+      CVRF ~ PA + AGE_SEX,
+      outcome = "SVD",
+      exposure = c("PA"),
+      coords = dag_coords()
+    ),
+    intermediate_cvrf = ggdag::dagify(
+      SVD ~ PA,
+      PA ~ AGE_SEX + CVRF,
+      CVRF ~ AGE_SEX,
+      outcome = "SVD",
+      exposure = c("CVRF"),
+      coords = dag_coords()
+    )
+  )
+}
+
+
+dag_labels <- function() {
+  c(
+    AGE_SEX = "Age +\n sex",
+    "AGE+SEX" = "Age and sex",
+    PA = "Physical\nactivity",
+    CVRFs = "CVRF",
+    CVRF = "CVRF",
+    "SVD burden" = "SVD burden",
+    SVD = "SVD\nburden",
+    "PA*CVRFs" = "Interaction effect",
+    "PA_CVRF" = "Interaction effect"
+  )
+}
+
+keyed_dict_lookup <- function(data, dict = dag_labels()) {
+  unname(dict[match(data, names(dict))])
+}
+
+add_dag_labels <- function(data) {
+  data$data$label <- keyed_dict_lookup(data$data$name, dict = dag_labels())
+
+  data
+}
+
+dag_colors <- function() {
+  c(
+    AGE_SEX = "grey65",
+    PA = "#3B528BFF",
+    CVRF = "#5DC863FF",
+    SVD = "#440154FF",
+    PA_CVRF = "#21908CFF"
+  )
+}
+
+dag_coords <- function() {
+  list(
+    x = c(SVD = 4, CVRF = 2, PA = 3, AGE_SEX = 1, PA_CVRF = 3),
+    y = c(SVD = 1, CVRF = 1, PA = sqrt(3) + 1, AGE_SEX = sqrt(3) + 1, PA_CVRF = sqrt(3) / 3 + 1)
+  )
+}
+
+dags_names <- function() {
+  c(
+    mediator = "Mediator",
+    confounder = "Confounder",
+    interaction = "Effect modification",
+    modification = "Effect modification",
+    independent = "Independent",
+    intermediate_pa = "PA is intermediate",
+    intermediate_cvrf = "CVRF is intermediate"
+  )
+}
+
+dags_plot <- function(data, plot.name = NULL) {
+  if (!is.null(plot.name)) {
+    plot.name <- keyed_dict_lookup(plot.name, dags_names())
+  }
+  data |>
+    ggdag::tidy_dagitty() |>
+    add_dag_labels() |>
+    dplyr::mutate(
+      name = factor(name),
+      adjusts = factor(ifelse(name == "AGE_SEX", "adjusted", "unadjusted"))
+    ) |>
+    # node_dconnected(from = c("PA", "CVRF"), controlling_for = "AGE_SEX") |>
+    ggplot2::ggplot(ggplot2::aes(
+      x = x,
+      y = y,
+      xend = xend,
+      yend = yend,
+      shape = adjusts,
+      col = name
+    )) +
+    ggdag::geom_dag_edges(end_cap = ggraph::circle(7, "mm")) +
+    # geom_dag_collider_edges() +
+    # ggdag::geom_dag_point(size = 8) +
+    # ggdag::geom_dag_text(col = "white") +
+    ggdag::geom_dag_label(
+      ggplot2::aes(
+        label = label,
+        fill = name
+      ),
+      col = "white",
+      size = 3
+      # label.padding = .15
+    ) +
+    ggdag::theme_dag() +
+    ggdag::scale_adjusted() +
+    ggdag::expand_plot(expand_y = ggplot2::expansion(c(0.2, 0.2))) +
+    # ggplot2::ggtitle(plot.name)+
+    ggplot2::scale_color_manual(
+      name = "name",
+      values = dag_colors()
+    ) +
+    ggplot2::scale_fill_manual(
+      name = "name",
+      values = dag_colors()
+    ) +
+    ggplot2::theme(legend.position = "none")
+}
