@@ -1,5 +1,5 @@
 digraph consort_diagram {
-  graph [layout = dot]
+  graph [layout = dot, splines=ortho]
 
 node [shape = rectangle, style = "rounded,filled", fillcolor = "#A9C7FD" color = "#4F81BD"]
 label4 [label = "Pooled subjects with AIS"]
@@ -13,16 +13,16 @@ label4 -> label5;
 # node definitions with substituted label text
   node [shape = rectangle, fillcolor = Biege, style="", fillcolor = "", color = ""]
 
-node1 [label = "All subjects (n=1055)"]
-node2 [label = "Excluded (n=172):\l• No acute MR performed (n=169)\l• Other reasons (n=3)\l"]
-node3 [label = "Final dataset (n=883)"]
+node1 [label = "All subjects (n=1,055)" group=A1]
+node2 [label = "Excluded (n=172)\l• No acute MR performed (n=169)\l• Other reasons (n=3)\l"]
+node3 [label = "Final dataset (n=883)" group=A1]
 
 
 ## Invisible point node for joints
 
-node [shape = point, width = 0]
+node [shape = point, width = 0, style=invis]
 
-P1
+P1 [group=A1]
 
 subgraph {
   rank = same; rankdir = LR; label4;  node1;

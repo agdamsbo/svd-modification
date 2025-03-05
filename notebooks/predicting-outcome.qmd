@@ -1,0 +1,98 @@
+---
+title: "Clincally applied SVD scoring as a predictor of stroke outcome"
+format: 
+  # docx:
+  #   fig-dpi: 300
+  html: default
+---
+
+```{r setup}
+library(see)
+source(here::here("R/functions.R"))
+df_all <- targets::tar_read(df_complete)
+
+df <- df_all |> dplyr::filter(include)
+
+df_format <- targets::tar_read(df_formatted)
+```
+
+## WHO-5 at EOS
+
+```{r}
+lm(who5_eos ~ simple_score_f + age + female_sex + nihss + tpa + evt,
+  data = df_format
+) |>
+  gtsummary::tbl_regression()
+
+plot(df_format$simple_score_f, df_format$who5_eos)
+
+df_format |>
+  ggplot2::ggplot(ggplot2::aes(x = simple_score_f, y = who5_eos)) +
+  ggplot2::geom_boxplot()
+
+df_format |>
+  dplyr::mutate(who5_eos_q = factor(project.aid::quantile_cut(who5_eos, 4, group.names = paste0("Q", 1:4)))) |>
+  vertical_stacked_bars(score = "who5_eos_q", group = "simple_score_f", t.size = 6, draw.lines = TRUE) +
+  ggplot2::labs(fill = "WHO-5 quartile") +
+  ggplot2::xlab("SVD score") +
+  ggplot2::theme(axis.title.y = ggplot2::element_text()) +
+  # ggplot2::ggtitle(name) +
+  ggplot2::ggtitle("WHO-5 quartile by SVD score")
+
+df_format |>
+  dplyr::mutate(who5_eos_q = factor(project.aid::quantile_cut(who5_eos, 4, group.names = paste0("Q", 1:4)))) |>
+  polr_map(
+    formula = who5_eos_q ~ simple_score_f + age + female_sex + nihss + tpa + evt,
+    Hess = TRUE,
+    method = "logistic"
+  ) |>
+  gtsummary::tbl_regression(exponentiate = TRUE) |>
+  fix_labels()
+```
+
+## mRS at EOS
+
+```{r}
+df_format |>
+  vertical_stacked_bars(score = "mrs_eos", group = "simple_score_f", t.size = 6, draw.lines = TRUE) +
+  ggplot2::labs(fill = "mRS score") +
+  ggplot2::xlab("SVD score") +
+  ggplot2::theme(axis.title.y = ggplot2::element_text()) +
+  # ggplot2::ggtitle(name) +
+  ggplot2::ggtitle("mRS by SVD score")
+```
+
+
+```{r}
+df_format |>
+  dplyr::mutate(mrs_eos = factor(mrs_eos)) |>
+  polr_map(
+    formula = mrs_eos ~ simple_score_f + age + female_sex + nihss + tpa + evt,
+    Hess = TRUE,
+    method = "logistic"
+  ) |>
+  gtsummary::tbl_regression(exponentiate = TRUE) |>
+  fix_labels()
+```
+
+
+### Further analyses
+
+```{r}
+ls <- targets::tar_read(ls_data)
+
+ls |>
+  purrr::pluck("svd_score") |>
+  dplyr::select(record_id, redcap_repeat_instance, svd_microbleed, svd_lacunes, svd_wmh, svd_atrophy) |>
+  dplyr::filter(!as.numeric(gsub("svd_", "", record_id)) %in% 1:65) |>
+  na.omit() |>
+  dplyr::mutate(dplyr::across(dplyr::all_of(c("svd_microbleed", "svd_lacunes", "svd_wmh", "svd_atrophy")), \(.x) factor(.x))) |>
+  tibble::as.tibble() |>
+  irr_icc_calc()
+```
+
+
+- Which elements of SVD are more closely associated?
+- How is the IRR? DONE
+- How does the above interact?
+- Are all elements necessary?

@@ -97,6 +97,11 @@ list(
     description = "Merged uni and mulitvariable olr analyses"
   ),
   tar_target(
+    name = list_multi_var_olr_steps,
+    command = mulitvar_olr(df_formatted,reg.fun = regression_uni_mini_multi_olr),
+    description = "Merged univariable, minimally adjusted and mulitvariable olr analyses"
+  ),
+  tar_target(
     name = list_multi_var_olr_interact,
     command = mulitvar_olr_interact(df_formatted),
     description = "List of minimally adjust interaction analyses"
@@ -130,6 +135,11 @@ list(
     name = lst_olr_interact_merged,
     command = multi_string_olr(data = df_formatted, out = "simple_score_f", pase = "pase_0_q", gen_exp = c("age", "female_sex"), main_exp = purrr::pluck(model_input(), "main_exp")),
     description = "Merged list of all (extended) planned anayses"
+  # ),
+  # tar_target(
+  #   name = tbl_olr_interact_merged,
+  #   command = merged_interact_table(lst_olr_interact_merged),
+  #   description = "Merged table of all (extended) planned anayses"
   )#,
   # tar_target(
   #   name = gt_mini_multi_merge,

@@ -1,0 +1,707 @@
+---
+title: "Small vessel disease burden in acute ischemic stroke - the role of physical activity and vascular risk factors"
+format: 
+  docx:
+    fig-dpi: 300
+  # html: default
+execute: 
+  echo: false
+  warning: false
+  messages: false
+---
+
+```{r setup}
+library(see)
+# library(performance)
+# library(patchwork)
+source(here::here("R/functions.R"))
+df_all <- targets::tar_read(df_complete)
+
+df <- df_all |> dplyr::filter(include)
+
+df_format <- targets::tar_read(df_formatted)
+
+df_format$pase_0_q <- forcats::fct_rev(df_format$pase_0_q)
+
+gtsummary::theme_gtsummary_journal("jama")
+```
+
+These are the planned analyses, tables and figures for the main article.
+
+Drop all the questions and save them for a later specific publication.
+
+Agreed upon scoring overview:
+
+```{r}
+df_format |>
+  svd_systems_overview(
+    list.system = svd_scoring_systems(),
+    subset = match("huijts_simple_ext_svd", names(svd_scoring_systems()))
+  ) |>
+  # gtsummary::as_gt() |>
+  # gt::tab_header(title = "SVD scoring system")|>
+  gt_theme()
+```
+
+# Baseline table
+
+```{r}
+#| tbl-cap: Baseline factors
+# dplyr::mutate(female_sex = dplyr::if_else(female_sex, "Female", "Male")) |>
+# dplyr::transmute(simple_score, age, female_sex= dplyr::if_else(female_sex, "Female", "Male"), nihss, tpa, evt, pase_0, alone) |>
+df_baseline <- df_format |>
+  dplyr::mutate(svd_score_04 = simple_score_f) |>
+  # get_vars(c("preds")) |>
+  dplyr::select(
+    dplyr::all_of(purrr::pluck(model_input(), "main_exp")),
+    svd_score_04, simple_microbleed, simple_lacunes, simple_wmh, simple_atrophy,
+    # nihss,
+    pase_0_q,
+    pase_0
+  ) |>
+  dplyr::mutate(
+    svd_score_04 = as.integer(svd_score_04)-1
+  ) |>
+  labelling_data()
+
+baseline_table <- df_baseline |>
+  dplyr::select(
+    svd_score_04,
+    dplyr::starts_with("simple_"),
+    dplyr::everything(),
+    -pase_0
+  ) |>
+  default_baseline(by = "pase_0_q")
+
+baseline_table |>
+  gtsummary::as_gt() |>
+  # gt::tab_header(title = "Baseline characteristics")|>
+  gt_theme()
+
+# baseline_table |>
+# gtsummary::add_p() |>
+# gtsummary::bold_p()
+
+# baseline_table |> save_table("baseline_table.docx")
+```
+
+```{r}
+dist <- c("huijts_simple_ext_svd") |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      # dplyr::mutate(age_grp = cut(age,c(0,65,100),labels=c("young","old"))) |>
+      svd_system_calc() |>
+      dplyr::mutate(pase_0_q = forcats::fct_rev(pase_0_q)) |>
+      vertical_stacked_bars(
+        score = .x
+      ) #+
+    # ggplot2::ggtitle(name) +
+    # ggplot2::ggtitle("Small Vesel Disease burden score distribution by PA level")
+  })
+dist[[1]]
+dist[[1]] |> gg_export(filename = "pase_dist.png")
+# c("huijts_simple_ext_svd") |>
+#   purrr::map(\(.x){
+#     name <- subset_named_labels(.x)
+#     df_format |>
+#       svd_system_calc() |>
+#       vertical_stacked_bars(score = .x, t.size = 2) +
+#       ggplot2::theme( # legend.position = "none",
+#         axis.title = ggplot2::element_text(),
+#         text = ggplot2::element_text(size = 10)
+#       ) +
+#       # ggplot2::ggtitle("") +
+#       # ggplot2::ggtitle("Smal Vesel Disease burden score") +
+#       ggplot2::xlab("Physical acitivty level") +
+#       ggplot2::ylab("Distribution")
+#   }) |>
+#   (\(.x){
+#     ggplot2::ggsave("svd_x_pa_dist.png",
+#       plot = .x[[1]], width = 140, height = 80, units = "mm", dpi = 600
+#     )
+#   })()
+```
+
+
+## Baseline table and distribution stratified by sex
+
+```{r}
+baseline_table_sex <- df_baseline |>
+  dplyr::select(
+    svd_score_04,
+    dplyr::starts_with("simple_"),
+    dplyr::everything(),
+    -pase_0
+  ) |>
+  dplyr::mutate(
+    female_sex = ifelse(female_sex, "FEMALE", "MALE")
+  ) |>
+  (\(.x){
+    split(.x, .x$female_sex)
+  })() |>
+  lapply(\(.x){
+    .x |>
+      dplyr::select(-female_sex) |>
+      default_baseline(by = "pase_0_q")
+  })
+
+baseline_table_sex_ls <- baseline_table_sex |>
+  purrr::imap(\(.x, .i){
+    list(.x) |>
+      gtsummary::tbl_merge(tab_spanner = .i) |>
+      gtsummary::as_gt() |>
+      # gt::tab_header(title = "Baseline characteristics")|>
+      gt_theme()
+  })
+
+baseline_table_sex_ls$FEMALE
+
+baseline_table_sex_ls$MALE
+```
+
+
+```{r}
+library(patchwork)
+dist_sex <- c("huijts_simple_ext_svd") |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    ls <- df_format |>
+      dplyr::mutate(
+        pase_0_q = forcats::fct_rev(pase_0_q),
+        female_sex = ifelse(female_sex, "FEMALE", "MALE")
+      ) |>
+      svd_system_calc() |>
+      (\(.z){
+        split(.z, .z$female_sex)
+      })() |>
+      purrr::imap(\(.y, .i){
+        .y |>
+          vertical_stacked_bars(
+            score = .x,
+            t.size = 6
+          ) #+
+        # ggplot2::theme(legend.position = "none") +
+        # ggplot2::ggtitle(name) +
+        # ggplot2::ggtitle(glue::glue("Small Vesel Disease burden score ({.i})"))
+      })
+    ls[[1]] + ls[[2]] + patchwork::guide_area() +
+      patchwork::plot_layout(
+        guides = "collect",
+        axes = "collect",
+        design = "
+        1
+        1
+        1
+        1
+        1
+        1
+        2
+        2
+        2
+        2
+        2
+        2
+        3
+        "
+      )
+  })
+print(dist_sex[[1]])
+dist_sex[[1]] |> gg_export(filename = "pase_dist_sex.png", height = 80)
+```
+
+# Regression analyses
+
+Below are a few simple comparisons of splitting PASE by overall PASE or stratified by sex.
+
+```{r}
+ms <- df_format |>
+  svd_system_calc() |>
+  dplyr::select(tidyselect::all_of(c(
+    purrr::pluck(model_input(), "gen_exp"),
+    purrr::pluck(model_input(), "main_exp"),
+    "pase_0_q",
+    "huijts_simple_ext_svd"
+  ))) |>
+  dplyr::mutate(
+    huijts_simple_ext_svd = factor(huijts_simple_ext_svd) # ,
+    # pase_0_q = forcats::fct_rev(pase_0_q)
+  ) |>
+  models_uni_mini_multi_olr(out = "huijts_simple_ext_svd")
+
+ms1 <- df_format |>
+  dplyr::mutate(
+    pase_0_q = strat_cut(
+      pase_0,
+      strat = female_sex,
+      groups = 4,
+      group.names = paste0("Q", 1:4)
+    ),
+    pase_0_q = forcats::fct_rev(pase_0_q)
+  ) |>
+  svd_system_calc() |>
+  dplyr::select(tidyselect::all_of(c(
+    purrr::pluck(model_input(), "gen_exp"),
+    purrr::pluck(model_input(), "main_exp"),
+    "pase_0_q",
+    "huijts_simple_ext_svd"
+  ))) |>
+  dplyr::mutate(
+    huijts_simple_ext_svd = factor(huijts_simple_ext_svd) # ,
+    # pase_0_q = forcats::fct_rev(pase_0_q)
+  ) |>
+  models_uni_mini_multi_olr(out = "huijts_simple_ext_svd")
+```
+
+```{r}
+ms |> lapply(broom::glance) |> dplyr::bind_rows()
+
+ms |>
+  purrr::map(\(.x){
+    .x |> default_regression_table()
+  }) |>
+  tbl_merge_named() |>
+  # gtsummary::remove_row_type(variables = -pase_0_q, type = "all") |>
+  gtsummary::as_gt() |>
+  gt::tab_source_note("Ordinal regression models of SVD burden score as main outcome with PASE score as the main exposure.")|>
+  # gt::tab_header(title = "Ordinal logistic regression analyses")|>
+  gt_theme()
+
+ms |>
+  purrr::map(\(.x){
+    .x |> default_regression_table(remove_all_but = FALSE)
+  }) |>
+  tbl_merge_named() |>
+  # gtsummary::remove_row_type(variables = -pase_0_q, type = "all") |>
+  gtsummary::as_gt() |>
+  gt::tab_source_note("Ordinal regression models of SVD burden score as main outcome with PASE score as the main exposure.")|>
+  # gt::tab_header(title = "Ordinal logistic regression analyses")|>
+  gt_theme()
+```
+
+#### Main analysis by sex
+
+```{r}
+sex_strat <- df_format |>
+  svd_system_calc() |>
+  dplyr::select(tidyselect::all_of(c(
+    purrr::pluck(model_input(), "gen_exp"),
+    purrr::pluck(model_input(), "main_exp"),
+    "pase_0_q",
+    "huijts_simple_ext_svd"
+  ))) |>
+  dplyr::mutate(
+    huijts_simple_ext_svd = factor(huijts_simple_ext_svd) # ,
+    # pase_0_q = forcats::fct_rev(pase_0_q)
+  ) |>
+  (\(.x){
+    split(.x, .x$female_sex)
+  })() |>
+  setNames(c("MALE", "FEMALE")) |>
+  purrr::map(\(.x){
+    models_uni_mini_multi_olr(.x, out = "huijts_simple_ext_svd")
+  })
+
+sex_strat |>
+  lapply(\(.x){
+    .x |>
+      purrr::map(\(.x){
+        .x |> default_regression_table()
+      }) |>
+      tbl_merge_named()
+  }) |>
+  (\(.x){
+    gtsummary::tbl_stack(.x, group_header = names(.x))
+  })() |>
+  gtsummary::as_gt() |>
+  gt::tab_source_note("Ordinal regression models of SVD burden score as main outcome stratified by sex with PASE score as the main exposure.") |>
+  # gt::tab_header(title = "Ordinal logistic regression analyses")|>
+  gt_theme()
+```
+
+#### Main analysis only prestroke mRS=0 and no previous event
+
+```{r}
+mrs_filter_mod <- df_format |>
+  dplyr::filter(mrs_pre==0, ais_tci==FALSE) |> 
+  svd_system_calc() |>
+  dplyr::select(tidyselect::all_of(c(
+    purrr::pluck(model_input(), "gen_exp"),
+    purrr::pluck(model_input(), "main_exp"),
+    "pase_0_q",
+    "huijts_simple_ext_svd"
+  ))) |>
+  dplyr::select(-mrs_pre, -ais_tci) |> 
+  dplyr::mutate(
+    huijts_simple_ext_svd = factor(huijts_simple_ext_svd) # ,
+    # pase_0_q = forcats::fct_rev(pase_0_q)
+  ) |> 
+  models_uni_mini_multi_olr(out = "huijts_simple_ext_svd")
+
+mrs_filter_mod |>
+  purrr::map(\(.x){
+    .x |> default_regression_table()
+  }) |>
+  tbl_merge_named() |>
+  # gtsummary::remove_row_type(variables = -pase_0_q, type = "all") |>
+  gtsummary::as_gt() |>
+  gt::tab_source_note("Ordinal regression models of SVD burden score as main outcome with PASE score as the main exposure.")|>
+  # gt::tab_header(title = "Ordinal logistic regression analyses")|>
+  gt_theme()
+```
+
+```{r}
+c("huijts_simple_ext_svd") |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      dplyr::filter(mrs_pre==0, ais_tci==FALSE) |>
+      svd_system_calc() |>
+      vertical_stacked_bars(
+        score = .x,
+        t.size = 6
+      ) +
+      ggplot2::theme(legend.position = "none") +
+      ggplot2::ggtitle(name) +
+      ggplot2::ggtitle("Small Vesel Disease burden score (mRS=0)")
+  })
+```
+
+#### Distribution with age stratification
+
+```{r}
+c("huijts_simple_ext_svd") |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      dplyr::mutate(age_grp = cut(age, c(0, 65, 100), labels = c("young", "old"))) |>
+      svd_system_calc() |>
+      vertical_stacked_bars(
+        score = .x,
+        strata = "age_grp",
+        t.size = 6
+      ) +
+      ggplot2::theme(legend.position = "none") +
+      ggplot2::ggtitle(name) +
+      ggplot2::ggtitle("Small Vesel Disease burden score")
+  })
+```
+
+```{r}
+age_strat <- df_format |>
+  svd_system_calc() |>
+  dplyr::select(tidyselect::all_of(c(
+    purrr::pluck(model_input(), "gen_exp"),
+    purrr::pluck(model_input(), "main_exp"),
+    "pase_0_q",
+    "huijts_simple_ext_svd"
+  ))) |>
+  dplyr::mutate(
+    age_grp = cut(age, c(0, 65, 100), labels = c("young (≤65)", "old (>65)")),
+    huijts_simple_ext_svd = factor(huijts_simple_ext_svd) # ,
+    # pase_0_q = forcats::fct_rev(pase_0_q)
+  ) |>
+  (\(.x){
+    split(.x, .x$age_grp)
+  })() |> 
+  purrr::map(\(.x){
+    models_uni_mini_multi_olr(.x, out = "huijts_simple_ext_svd")
+  })
+
+age_strat |>
+  lapply(\(.x){
+    .x |>
+      purrr::map(\(.x){
+        .x |> default_regression_table()
+      }) |>
+      tbl_merge_named()
+  }) |>
+  (\(.x){
+    gtsummary::tbl_stack(.x, group_header = names(.x))
+  })() |>
+  gtsummary::as_gt() |>
+  gt::tab_source_note("Ordinal regression models of SVD burden score as main outcome stratified by age (≤65 or >65 years of age) with PASE score as the main exposure.") |>
+  # gt::tab_header(title = "Ordinal logistic regression analyses")|>
+  gt_theme()
+```
+
+#### Baseline and distribution with trial stratification
+
+```{r}
+baseline_table_trial <- df_format |>
+  dplyr::mutate(svd_score_04 = simple_score_f) |>
+  # get_vars(c("preds")) |>
+  dplyr::select(
+    dplyr::all_of(purrr::pluck(model_input(), "main_exp")),
+    svd_score_04, simple_microbleed, simple_lacunes, simple_wmh, simple_atrophy,
+    # nihss,
+    pase_0_q,
+    pase_0,
+    trial
+  ) |>
+  dplyr::mutate(
+    pase_0_q = forcats::fct_rev(pase_0_q),
+    svd_score_04 = as.integer(svd_score_04)-1
+  ) |>
+  labelling_data() |>
+  dplyr::select(
+    svd_score_04,
+    dplyr::starts_with("simple_"),
+    dplyr::everything(),
+    -pase_0,
+    -pase_0_q
+  ) |> 
+  # (\(.x){
+  #   split(.x,.x$female_sex)
+  # })() |>
+  # lapply(\(.x){
+  #   .x|>
+  #     dplyr::select(-female_sex) |>
+  # default_baseline(by = NULL)
+  # }) |> gtsummary::tbl_stack()|>
+  default_baseline(by = "trial")
+
+baseline_table_trial |>
+  gtsummary::as_gt() |>
+  # gt::tab_header(title = "Baseline characteristics")|>
+  gt_theme()
+```
+
+
+```{r}
+c("huijts_simple_ext_svd") |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      dplyr::mutate(age_grp = cut(age, c(0, 65, 100), labels = c("young", "old"))) |>
+      svd_system_calc() |>
+      vertical_stacked_bars(
+        score = .x,
+        strata = "age_grp",
+        t.size = 6
+      ) +
+      ggplot2::theme(legend.position = "none") +
+      ggplot2::ggtitle(name) +
+      ggplot2::ggtitle("Small Vesel Disease burden score")
+  })
+```
+
+```{r}
+trial_strat <- df_format |>
+  svd_system_calc() |>
+  dplyr::select(tidyselect::all_of(c(
+    purrr::pluck(model_input(), "gen_exp"),
+    purrr::pluck(model_input(), "main_exp"),
+    "pase_0_q",
+    "huijts_simple_ext_svd",
+    "trial"
+  ))) |>
+  dplyr::mutate(
+    trial = factor(trial),
+    huijts_simple_ext_svd = factor(huijts_simple_ext_svd) # ,
+    # pase_0_q = forcats::fct_rev(pase_0_q)
+  ) |>
+  (\(.x){
+    split(.x, .x$trial)
+  })() |> 
+  purrr::map(\(.x){
+    models_uni_mini_multi_olr(.x, out = "huijts_simple_ext_svd")
+  })
+
+trial_strat |>
+  lapply(\(.x){
+    .x |>
+      purrr::map(\(.x){
+        .x |> default_regression_table()
+      }) |>
+      tbl_merge_named()
+  }) |>
+  (\(.x){
+    gtsummary::tbl_stack(.x, group_header = names(.x))
+  })() |>
+  gtsummary::as_gt() |>
+  gt::tab_source_note("Ordinal regression models of SVD burden score as main outcome stratified by trial (TALOS or RESIST) with PASE score as the main exposure.") |>
+  # gt::tab_header(title = "Ordinal logistic regression analyses")|>
+  gt_theme()
+```
+
+
+
+## Collinearity
+
+```{r}
+c(ms, ms1)[c(2:3, 5:6)] |> lapply(car::vif)
+
+## No collinearity
+```
+
+```{r}
+# df_inv <- df_format |>
+#   svd_system_calc()
+#
+# pairs(dplyr::select(df_inv,age,huijts_simple_ext_svd,pase_0))
+```
+
+## Model performances
+
+```{r}
+performance::compare_performance(c(ms, ms1))
+## The multivariable model with strat_cut pase quartiles has the best fit by AIC.
+broom::glance(ms[[3]])
+broom::glance(ms1[[3]])
+```
+
+
+## Archive
+
+### Baseline table and distribution based on stratified PASE cuts (by sex)
+
+```{r}
+baseline_table_pase_sex <- df_baseline |>
+  dplyr::mutate(
+    pase_0_q_sex = strat_cut(
+      pase_0,
+      strat = female_sex,
+      groups = 4,
+      group.names = paste0("Q", 1:4)
+    )
+  ) |>
+  dplyr::select(
+    svd_score_04,
+    dplyr::starts_with("simple_"),
+    dplyr::everything(),
+    -pase_0,
+    -pase_0_q
+  ) |> 
+  # (\(.x){
+  #   split(.x,.x$female_sex)
+  # })() |>
+  # lapply(\(.x){
+  #   .x|>
+  #     dplyr::select(-female_sex) |>
+  # default_baseline(by = NULL)
+  # }) |> gtsummary::tbl_stack()|>
+  default_baseline(by = "pase_0_q_sex")
+
+baseline_table_pase_sex |>
+  gtsummary::as_gt() |>
+  # gt::tab_header(title = "Baseline characteristics")|>
+  gt_theme()
+```
+
+
+```{r}
+dist_pase_by_sex <- c("huijts_simple_ext_svd") |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      dplyr::mutate(
+        pase_0_q = strat_cut(
+          pase_0,
+          strat = female_sex,
+          groups = 4,
+          group.names = paste0("Q", 1:4)
+        ) # ,
+        # pase_0_q = forcats::fct_rev(pase_0_q)
+      ) |>
+      # dplyr::mutate(age_grp = cut(age,c(0,65,100),labels=c("young","old"))) |>
+      svd_system_calc() |>
+      vertical_stacked_bars(
+        score = .x
+      ) #+
+    # ggplot2::theme(legend.position = "none") +
+    # ggplot2::ggtitle(name) +
+    # ggplot2::ggtitle("Small Vesel Disease burden score")
+  })
+dist_pase_by_sex
+dist_pase_by_sex[[1]] |> gg_export(filename = "pase_dist_pase_by_sex.png")
+```
+
+#### Main analysis with PASE cut stratified by sex
+
+```{r}
+ms1 |>
+  purrr::map(\(.x){
+    .x |> default_regression_table()
+  }) |>
+  tbl_merge_named() |>
+  gtsummary::as_gt() |>
+  gt::tab_source_note("Ordinal regression models of SVD burden score as main outcome with PASE score quartiles cut stratified by sex as the main exposure.") |> 
+  # gt::tab_header(title = "Ordinal logistic regression analyses")|>
+  gt_theme()
+```
+
+
+### Multiple score versions
+
+```{r}
+ls <- paste0("simple_", c("atrophy", "lacunes", "microbleed", "wmh")) |> 
+  project.aid::combn_perm(perm=TRUE) |> 
+  lapply(\(.x){
+    # browser()
+    create_n_models(data = df_format,vars = .x,covars = c("pase_0_q", "age", "female_sex"))
+  })
+purrr::list_flatten(ls) |> performance::compare_performance()
+## Strange and surprising!!
+```
+
+### TOAST strat
+
+```{r}
+baseline_table_toast <- df_format |>
+  dplyr::mutate(svd_score_04 = simple_score_f) |>
+  # get_vars(c("preds")) |>
+  dplyr::select(
+    dplyr::all_of(purrr::pluck(model_input(), "main_exp")),
+    svd_score_04, simple_microbleed, simple_lacunes, simple_wmh, simple_atrophy,
+    # nihss,
+    pase_0_q,
+    pase_0,
+    trial,
+    toast
+  ) |>
+  dplyr::mutate(
+    pase_0_q = forcats::fct_rev(pase_0_q),
+    svd_score_04 = as.integer(svd_score_04)-1
+  ) |>
+  labelling_data() |>
+  dplyr::select(
+    svd_score_04,
+    dplyr::starts_with("simple_"),
+    dplyr::everything(),
+    -pase_0,
+    pase_0_q
+  ) |> 
+  # (\(.x){
+  #   split(.x,.x$female_sex)
+  # })() |>
+  # lapply(\(.x){
+  #   .x|>
+  #     dplyr::select(-female_sex) |>
+  # default_baseline(by = NULL)
+  # }) |> gtsummary::tbl_stack()|>
+  default_baseline(by = "trial")
+
+baseline_table_toast|>
+  gtsummary::as_gt() |>
+  # gt::tab_header(title = "Baseline characteristics")|>
+  gt_theme()
+```
+
+
+```{r}
+c("huijts_simple_ext_svd") |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      svd_system_calc() |>
+      vertical_stacked_bars(
+        score = .x,
+        strata = "toast",
+        t.size = 6
+      ) +
+      ggplot2::theme(legend.position = "none") +
+      ggplot2::ggtitle(name) +
+      ggplot2::ggtitle("Small Vesel Disease burden score by TOAST classification")
+  })
+```

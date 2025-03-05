@@ -1,0 +1,190 @@
+---
+title: "SVD burden and PA"
+subtitle: "Pooled TALOS and RESIST data"
+date: last-modified
+author:
+  - name: Andreas Gammelgaard Damsbo
+    # orcid: 0000-0002-7559-1154
+    # email: andrlr@rm.dk
+    # url: https://pure.au.dk/portal/en/persons/andreas-gammelgaard-damsbo(e3c4afce-3eba-4456-8b8b-2fd90775c87a).html
+#     affiliations:
+#       - ref: dsc
+#     #   - ref: dcm
+#     #   - ref: sdc
+# affiliations:
+#   - id: dsc
+#     name: Danish Stroke Centre, AUH
+#     city: Aarhus
+#     state: Denmark
+#     url: https://www.en.auh.dk/departments/danish-stroke-centre/
+#   - id: dcm
+#     name: Department of Clinical Medicine, AU
+#     city: Aarhus
+#     state: Denmark
+#     url: https://clin.au.dk/
+#   - id: sdc
+#     name: Steno Diabetes Centre, AUH
+#     city: Aarhus
+#     state: Denmark
+#     url: https://www.stenoaarhus.dk/
+format: 
+  revealjs:
+    # footer: "ENIGMA status - 13.jan.2025"
+    slide-level: 4
+    progress: true
+    show-slide-number: all
+    slide-number: h.v
+    toc: false
+    toc-title: "Indhold"
+    toc-depth: 1
+    # logo: images/dsc_hoved.png
+    theme: simple
+    embed-resources: true
+    scrollable: true
+editor: source
+---
+
+```{r setup}
+library(see)
+# library(performance)
+# library(patchwork)
+source(here::here("R/functions.R"))
+df_all <- targets::tar_read(df_complete)
+
+df <- df_all |> dplyr::filter(include)
+
+df_format <- targets::tar_read(df_formatted)
+```
+
+# Intro
+
+
+-   Small vessel disease (SVD) is a major contributor to stroke and cognitive decline.
+
+-   Hypertension, diabetes, and smoking are well-established contributors to SVD burden, the role of physical activity (PA) is still debated.
+
+-   We aimed to investigate the association of SVD burden, PA and classical risk factors in acute ischemic stroke (AIS) patients.
+
+-   Pooled data from TALOS and RESIST trials
+
+
+# SVD scoring scale
+
+| *Feature*                         | *Score* |
+|-----------------------------------|:-------:|
+| Cerebral microbleed               |    1    |
+| Lacune                            |    1    |
+| Beginning WMH confluence (Fazeka) |    1    |
+| Moderate-severe atrophy (GCA)     |    1    |
+
+: Each feature is summed for a score of 0-4.
+
+## Features 1/2
+
+![](images/strive1-features.png){fig-align="center"}
+
+## Features 2/2
+
+![](images/gca-flair.png){fig-align="center"}
+
+# Baseline table
+
+##  {.scrollable}
+
+```{r}
+#| tbl-cap: Baseline factors
+baseline_table <- df_format |>
+  dplyr::mutate(svd_score_04=simple_score_f) |> 
+  # get_vars(c("preds")) |>
+  dplyr::select(dplyr::all_of(purrr::pluck(model_input(), "main_exp")),
+                svd_score_04,
+                nihss,
+                pase_0_q) |>
+  dplyr::mutate(pase_0_q=forcats::fct_rev(pase_0_q)) |> 
+  # dplyr::mutate(female_sex = dplyr::if_else(female_sex, "Female", "Male")) |>
+  # dplyr::transmute(simple_score, age, female_sex= dplyr::if_else(female_sex, "Female", "Male"), nihss, tpa, evt, pase_0, alone) |>
+  labelling_data() |>
+  gtsummary::tbl_summary(
+    by = pase_0_q,
+    missing = "no"
+  ) |>
+gtsummary::add_p() |>
+gtsummary::add_overall()
+
+baseline_table|>
+  gtsummary::as_gt()
+
+# baseline_table |>
+#   gtsummary::as_gt() |>
+#   # gt::tab_header(title = "Baseline characteristics")|>
+#   gt_theme()
+```
+
+# SVD distribution
+
+```{r}
+c("huijts_simple_ext_svd") |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      svd_system_calc() |>
+      vertical_stacked_bars(score = .x, t.size = 6) +
+      ggplot2::theme(legend.position = "bottom") +
+      # ggplot2::ggtitle(name) +
+      ggplot2::ggtitle("Small Vesel Disease burden score distribution")
+  })
+```
+
+# Analyses
+
+## Ordinal logistic regression
+
+### 
+
+```{r}
+#| tbl-cap: Univariable and multivariable ordinal logistic regression of considered effect modifiers.
+
+targets::tar_read(list_multi_var_olr)
+```
+
+## Adding interaction terms
+
+```{r}
+#| tbl-cap: Merged analysis results. ALl analyses are adjusted for age and sex.
+#| eval: false
+tbl_all <- targets::tar_read(lst_olr_interact_merged) |>
+  purrr::imap(\(.x, .i) {
+    purrr::map(.x, \(.y) {
+      # browser()
+      gtsummary::tbl_regression(.y, exponentiate = TRUE) |>
+        compress_logical_vars()
+    }) |>
+      tbl_merge_named() |>
+      gtsummary::remove_row_type(
+        variables = -dplyr::one_of(.i),
+        type = "all"
+      )
+  }) |>
+  gtsummary::tbl_stack() |>
+  fix_labels()#|>
+  # gtsummary::as_gt() |>
+  # gt::tab_footnote(footnote = "All analyses adjusted for age and sex")
+  # gt::tab_header(title = "Ordinal logistic regression analyses")|>
+  # gt_theme()
+
+gtsummary::as_kable(tbl_all)
+```
+
+::: r-fit-text
+|  |  |  |  |  |  |  |
+|-----------|-----------|-----------|-----------|-----------|-----------|-----------|
+|  | No adjustment | No adjustment | PA adjustment | PA adjustment | PA interaction | PA interaction |
+| **Characteristic** | **OR** | **95% CI** | **OR** | **95% CI** | **OR** | **95% CI** |
+| Smoking |  |  |  |  |  |  |
+| \- never | — | — | — | — | — | — |
+| \- current | 1.63 | 1.14, 2.34 | 1.55 | 1.08, 2.23 | 1.28 | 0.62, 2.69 |
+| \- prior | 1.44 | 1.04, 2.00 | 1.41 | 1.02, 1.97 | 1.76 | 0.86, 3.64 |
+| Hypertension | 1.91 | 1.43, 2.54 | 1.88 | 1.41, 2.50 | 2.12 | 1.18, 3.83 |
+| Diabetes | 1.46 | 0.96, 2.22 | 1.40 | 0.92, 2.13 | 1.81 | 0.56, 5.38 |
+| Previous ischemic event | 2.28 | 1.52, 3.41 | 2.21 | 1.48, 3.31 | 1.47 | 0.56, 3.73 |
+:::

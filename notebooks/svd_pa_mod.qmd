@@ -39,22 +39,46 @@ df_format |>
   gt_theme()
 ```
 
-### Baseline table
+# Baseline table
 
 ```{r}
 #| tbl-cap: Baseline factors
 baseline_table <- df_format |>
+  dplyr::mutate(svd_score_04 = simple_score_f) |>
   # get_vars(c("preds")) |>
-  dplyr::select(dplyr::all_of(purrr::pluck(model_input(), "main_exp"))) |>
+  dplyr::select(
+    dplyr::all_of(purrr::pluck(model_input(), "main_exp")),
+    svd_score_04, simple_microbleed, simple_lacunes, simple_wmh, simple_atrophy,
+    # nihss,
+    pase_0_q
+  ) |>
+  dplyr::select(
+    svd_score_04,
+    dplyr::starts_with("simple_"),
+    dplyr::everything()
+  ) |>
+  dplyr::mutate(
+    pase_0_q = forcats::fct_rev(pase_0_q),
+    svd_score_04 = as.numeric(svd_score_04)
+  ) |>
   # dplyr::mutate(female_sex = dplyr::if_else(female_sex, "Female", "Male")) |>
   # dplyr::transmute(simple_score, age, female_sex= dplyr::if_else(female_sex, "Female", "Male"), nihss, tpa, evt, pase_0, alone) |>
   labelling_data() |>
   gtsummary::tbl_summary(
-    # by = trial,
-    missing = "no"
-  ) #|>
-# gtsummary::add_p() |>
-# gtsummary::add_overall()
+    by = pase_0_q,
+    missing = "no", type = list(svd_score_04 = "continuous"),
+    label = list(
+      simple_microbleed = "Microbleeds (any)",
+      simple_lacunes = "Lacunes (any)",
+      simple_wmh = "Begininng confluenting areas of WMH (Fazekas 2-3)",
+      simple_atrophy = "Moderate-Severe global atrophy (GCA 2-3)"
+    )
+  ) |>
+  gtsummary::add_p() |>
+  gtsummary::add_overall() |>
+  bstfun::add_variable_grouping(
+    "SVD subscore items" = c("simple_microbleed", "simple_lacunes", "simple_wmh", "simple_atrophy")
+  )
 
 baseline_table |>
   gtsummary::as_gt() |>
@@ -68,13 +92,19 @@ baseline_table |>
 # baseline_table |> save_table("baseline_table.docx")
 ```
 
+NIHSS fordeling er associeret til PASE, men ikke til SVD score(!)
+
 ```{r}
 c("huijts_simple_ext_svd") |>
   purrr::map(\(.x){
     name <- subset_named_labels(.x)
     df_format |>
+      # dplyr::mutate(age_grp = cut(age,c(0,65,100),labels=c("young","old"))) |>
       svd_system_calc() |>
-      vertical_stacked_bars(score = .x, t.size = 6) +
+      vertical_stacked_bars(
+        score = .x,
+        t.size = 6
+      ) +
       ggplot2::theme(legend.position = "none") +
       ggplot2::ggtitle(name) +
       ggplot2::ggtitle("Small Vesel Disease burden score")
@@ -102,10 +132,11 @@ c("huijts_simple_ext_svd") |>
   })()
 ```
 
-### Planned analyses
+# Regression analyses
 
 ```{r}
 #| tbl-cap: Minimaly adjusted models with age and sex.
+#| include: false
 purrr::pluck(targets::tar_read(lst_multi_olr_orig), "complete_list")[[1]] |>
   fix_labels() |>
   gtsummary::as_gt() |>
@@ -113,18 +144,82 @@ purrr::pluck(targets::tar_read(lst_multi_olr_orig), "complete_list")[[1]] |>
   gt_theme()
 ```
 
-### Independent correlations in multivariable analysis
+## Independent correlations in multivariable analysis
 
 ```{r}
-targets::tar_read(list_multi_var_olr) |>
+# targets::tar_read(list_multi_var_olr) |>
+#   gtsummary::as_gt() |>
+#   # gt::tab_header(title = "Ordinal logistic regression analyses")|>
+#   gt_theme()
+```
+
+```{r}
+targets::tar_read(list_multi_var_olr_steps) |>
   gtsummary::as_gt() |>
   # gt::tab_header(title = "Ordinal logistic regression analyses")|>
   gt_theme()
 ```
 
+```{r}
+ms <- targets::tar_read(df_formatted) |>
+  svd_system_calc() |>
+  dplyr::select(tidyselect::all_of(c(
+    purrr::pluck(model_input(), "gen_exp"),
+    purrr::pluck(model_input(), "main_exp"),
+    "pase_0_q",
+    "huijts_simple_ext_svd"
+  ))) |>
+  dplyr::mutate(
+    huijts_simple_ext_svd = factor(huijts_simple_ext_svd) # ,
+    # pase_0_q = forcats::fct_rev(pase_0_q)
+  ) |>
+  models_uni_mini_multi_olr(out = "huijts_simple_ext_svd")
+
+insight::model_info(ms$Univariable)
+insight::supported_models()
+
+caret::varImp(ms$Univariable)
+
+car::vif(ms$Multivariable)
+
+performance::model_performance(ms$Multivariable)
+
+broom::glance(ms$Multivariable)
+
+performance::compare_performance(ms)
+
+ms |> lapply(performance::model_performance) |> dplyr::bind_rows()
+```
+
+```{r}
+ds <- targets::tar_read(df_formatted)
+genodds::genodds(ds$simple_score, project.aid::quantile_cut(ds$pase_0, 2, group.names = c("low", "high")),
+  # strata = project.aid::quantile_cut(ds$age,groups = 2,group.names = c("y","O"))
+  strata = ds$female_sex
+)
+```
+
+```{r}
+targets::tar_read(df_formatted) |>
+  (\(.x){
+    split(.x, .x$female_sex)
+  })() |>
+  setNames(c("MALE", "FEMALE")) |>
+  lapply(\(ds){
+    genodds::genodds(
+      ds$simple_score,
+      # strata = project.aid::quantile_cut(ds$age,groups = 2,group.names = c("y","O")),
+      project.aid::quantile_cut(ds$pase_0, 2, group.names = c("low", "high"))
+    )
+  })
+```
+
+
+
 ### Complete simple interaction analyses
 
 ```{r}
+#| include: false
 targets::tar_read(list_multi_var_olr_interact) |>
   purrr::map(fix_labels) |>
   (\(.x){
@@ -136,10 +231,11 @@ targets::tar_read(list_multi_var_olr_interact) |>
   gt_theme()
 ```
 
-
 ### Merged table of adjustments and interact
 
 ```{r}
+#| tbl-cap: Merged table of adjustments and interact
+#| include: false
 targets::tar_read(lst_olr_interact_merged) |>
   purrr::imap(\(.x, .i) {
     purrr::map(.x, \(.y) {
@@ -153,9 +249,128 @@ targets::tar_read(lst_olr_interact_merged) |>
       )
   }) |>
   gtsummary::tbl_stack() |>
-  fix_labels()|>
+  fix_labels() |>
   gtsummary::as_gt() |>
   gt::tab_footnote(footnote = "All analyses adjusted for age and sex") |>
   # gt::tab_header(title = "Ordinal logistic regression analyses")|>
   gt_theme()
+```
+
+#### Main analysis by sex
+
+```{r}
+sex_strat <- targets::tar_read(df_formatted) |>
+  (\(.x){
+    split(.x, .x$female_sex)
+  })() |>
+  setNames(c("MALE", "FEMALE")) |>
+  purrr::map(\(.x){
+    ls <- planned_multi_olr(.x, gen_exp = "age") |>
+      purrr::pluck("complete_list")
+
+    ls[[1]] |>
+      fix_labels()
+  })
+sex_strat |> gtsummary::tbl_merge()
+```
+
+
+```{r}
+l.sex <- targets::tar_read(df_formatted) |>
+  (\(.x){
+    .x |>
+      dplyr::mutate(
+        pase_0_q = project.aid::quantile_cut(
+          x = pase_0,
+          groups = 4,
+          group.names = paste0("Q", 1:4)
+        )
+      ) |>
+      split(.x$female_sex)
+  })() |>
+  setNames(c("MALE", "FEMALE")) |>
+  lapply(\(.x){
+    mulitvar_olr(.x, reg.fun = regression_uni_mini_multi_olr)
+  })
+
+l.sex |>
+  (\(.x){
+    gtsummary::tbl_stack(
+      tbls = .x,
+      group_header = names(.x)
+    )
+  })()
+```
+
+
+```{r}
+c("huijts_simple_ext_svd") |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      dplyr::mutate(
+        age_grp = cut(age, c(0, 65, 100), labels = c("young", "old")),
+        sex = c("male", "female")[female_sex + 1]
+      ) |>
+      svd_system_calc() |>
+      vertical_stacked_bars(
+        score = .x,
+        strata = "sex",
+        t.size = 6
+      ) +
+      ggplot2::theme(legend.position = "none") +
+      ggplot2::ggtitle(name) +
+      ggplot2::ggtitle("Small Vesel Disease burden score stratified by sex")
+  })
+```
+
+
+#### Distribution with age stratification
+
+```{r}
+c("huijts_simple_ext_svd") |>
+  purrr::map(\(.x){
+    name <- subset_named_labels(.x)
+    df_format |>
+      dplyr::mutate(age_grp = cut(age, c(0, 65, 100), labels = c("young", "old"))) |>
+      svd_system_calc() |>
+      vertical_stacked_bars(
+        score = .x,
+        strata = "age_grp",
+        t.size = 6
+      ) +
+      ggplot2::theme(legend.position = "none") +
+      ggplot2::ggtitle(name) +
+      ggplot2::ggtitle("Small Vesel Disease burden score")
+  })
+```
+
+
+## Collinearity
+
+```{r}
+mod <- df_format |>
+  svd_system_calc() |>
+  dplyr::select(tidyselect::all_of(c(
+    purrr::pluck(model_input(), "gen_exp"),
+    purrr::pluck(model_input(), "main_exp"),
+    "pase_0_q",
+    "huijts_simple_ext_svd"
+  ))) |>
+  dplyr::mutate(
+    huijts_simple_ext_svd = factor(huijts_simple_ext_svd) # ,
+    # pase_0_q = forcats::fct_rev(pase_0_q)
+  ) |>
+  multivariable_olr(
+    out = "huijts_simple_ext_svd"
+  )
+
+performance::check_model(mod)
+```
+
+```{r}
+# df_inv <- df_format |>
+#   svd_system_calc()
+#
+# pairs(dplyr::select(df_inv,age,huijts_simple_ext_svd,pase_0))
 ```

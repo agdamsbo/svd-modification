@@ -1,0 +1,42 @@
+---
+title: "importance"
+format: html
+---
+
+```{r setup}
+# library(see)
+# library(performance)
+# library(patchwork)
+source(here::here("R/functions.R"))
+df_all <- targets::tar_read(df_complete)
+
+df <- df_all |> dplyr::filter(include)
+
+df_format <- targets::tar_read(df_formatted)
+
+```
+
+```{r}
+df_select <- df_format |>
+    svd_system_calc() |>
+    dplyr::select(tidyselect::all_of(c(
+      purrr::pluck(model_input(), "gen_exp"),
+      purrr::pluck(model_input(), "main_exp"),
+      "pase_0_q",
+      "huijts_simple_ext_svd"
+    ))) |>
+    dplyr::mutate(
+      huijts_simple_ext_svd = factor(huijts_simple_ext_svd) # ,
+      # pase_0_q = forcats::fct_rev(pase_0_q)
+    )
+
+m <- multivariable_olr(
+      data = df_select,
+      out = "huijts_simple_ext_svd"
+    )
+
+vip::vi(m, train=df_select, method = "permute", target = "huijts_simple_ext_svd", metric = "mae", pred_wrapper = predict, nsim = 1000)
+vip::list_metrics()
+summary(m)
+```
+

@@ -1,0 +1,27 @@
+---
+title: "RESIST SVD score with lacunes"
+format: docx
+---
+
+# SVD score in RESIST patients with one or more lacunes
+
+```{r}
+#| echo: false
+df_format <- targets::tar_read(df_formatted)
+
+df_filtered <- df_format |> 
+  dplyr::filter(trial=="RESIST",
+                lacunes_f!="0") |> 
+  dplyr::select(simple_score,simple_score_f_n)
+  
+gtsummary::theme_gtsummary_journal(journal = "nejm",set_theme = TRUE)
+
+df_filtered |> 
+  gtsummary::tbl_summary(
+    type = list(simple_score_f_n ~ "continuous"),
+    label = list(simple_score = "SVD score distribution",
+                 simple_score_f_n = "SVD score median (IQR)")
+  ) 
+  
+```
+
